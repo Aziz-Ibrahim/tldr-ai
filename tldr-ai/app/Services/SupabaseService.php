@@ -11,7 +11,7 @@ class SupabaseService
 
     public function __construct()
     {
-        $this->projectUrl = env('SUPABASE_URL');
+        $this->projectUrl = env('SUPABASE_URL'); // e.g. https://your-project.supabase.co
         $this->serviceRoleKey = env('SUPABASE_SERVICE_ROLE_KEY');
     }
 
@@ -29,6 +29,7 @@ class SupabaseService
      */
     public function listFiles(string $bucket, string $prefix = ''): array
     {
+        // Fixed URL - removed '/bucket' from path
         $url = "{$this->projectUrl}/storage/v1/object/list/{$bucket}";
 
         // Always include prefix, even if empty
@@ -52,8 +53,14 @@ class SupabaseService
      */
     public function uploadFile(string $bucket, string $path, string $filePath, bool $upsert = true): array
     {
+        // Fixed URL - removed 's' from 'buckets'
         $url = "{$this->projectUrl}/storage/v1/object/{$bucket}/{$path}";
 
+        // Read file contents
+        if (!file_exists($filePath)) {
+            throw new \Exception("File not found: {$filePath}");
+        }
+        
         $contents = file_get_contents($filePath);
         
         // Get file mime type
@@ -65,6 +72,7 @@ class SupabaseService
             'Content-Type' => $mimeType,
         ];
 
+        // Add upsert header if needed
         if ($upsert) {
             $headers['x-upsert'] = 'true';
         }
@@ -85,6 +93,7 @@ class SupabaseService
      */
     public function deleteFile(string $bucket, string $path): array
     {
+        // Fixed URL - removed 's' from 'buckets'
         $url = "{$this->projectUrl}/storage/v1/object/{$bucket}/{$path}";
 
         $response = Http::withHeaders($this->headers())->delete($url);

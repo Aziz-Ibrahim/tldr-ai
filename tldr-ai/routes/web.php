@@ -15,6 +15,9 @@ Route::middleware(['auth'])->group(function () {
     // Handle uploads from dashboard form
     Route::post('/dashboard/upload', [DashboardController::class, 'upload'])->name('dashboard.upload');
 
+    // Add this inside your auth middleware group
+    Route::post('/dashboard/generate-summary', [DashboardController::class, 'generateSummary'])->name('dashboard.generate-summary');
+
     // Breeze profile routes (edit profile, update password, delete account)
     Route::get('/profile', [\App\Http\Controllers\ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [\App\Http\Controllers\ProfileController::class, 'update'])->name('profile.update');
