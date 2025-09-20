@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class SupabaseService
 {
@@ -63,6 +64,12 @@ class SupabaseService
         
         $contents = file_get_contents($filePath);
         
+        if ($contents === false) {
+            throw new \Exception("Could not read file contents: {$filePath}");
+        }
+        
+        Log::info("File size to upload: " . strlen($contents) . " bytes");
+        
         // Get file mime type
         $mimeType = mime_content_type($filePath) ?: 'application/octet-stream';
 
@@ -77,12 +84,19 @@ class SupabaseService
             $headers['x-upsert'] = 'true';
         }
 
+        Log::info("Uploading to URL: " . $url);
+        Log::info("Headers: " . json_encode(array_keys($headers))); // Don't log actual keys
+        Log::info("MIME type: " . $mimeType);
+
         $response = Http::withHeaders($headers)
             ->withBody($contents)
             ->post($url);
 
+        Log::info("Upload response status: " . $response->status());
+        Log::info("Upload response body: " . $response->body());
+
         if ($response->failed()) {
-            throw new \Exception("Supabase upload failed: " . $response->body());
+            throw new \Exception("Supabase upload failed (HTTP " . $response->status() . "): " . $response->body());
         }
 
         return $response->json();
