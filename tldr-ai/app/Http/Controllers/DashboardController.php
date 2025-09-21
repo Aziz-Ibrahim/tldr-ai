@@ -310,7 +310,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * Generate AI summary from file URL (IMPROVED VERSION)
+     * Generate AI summary from file URL (IMPROVED WITH RETRY LOGIC)
      */
     protected function generateSummaryFromUrl(string $fileUrl, string $mimeType): string
     {
@@ -332,9 +332,21 @@ class DashboardController extends Controller
         // Clean and limit content for text files
         if (strpos($mimeType, 'text/') === 0) {
             $content = trim($content);
+            
+            // Fix UTF-8 encoding issues
+            $content = mb_convert_encoding($content, 'UTF-8', 'UTF-8');
+            $content = mb_scrub($content, 'UTF-8'); // Remove invalid sequences
+            
+            // Remove any remaining problematic characters
+            $content = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $content);
+            // Use iconv for better UTF-8 cleaning (revert to more reliable approach)
+            $content = iconv('UTF-8', 'UTF-8//IGNORE', $content);
+            $content = preg_replace('/[^\x20-\x7E\t\n\r]/', '', $content); // Keep only printable ASCII + tabs/newlines
+            
             // Use more content for better summaries
-            $content = substr($content, 0, 1500);
+            $content = substr($content, 0, 1000);
             Log::info('Text content prepared for AI, length: ' . strlen($content) . ' characters');
+            Log::info('Content preview: ' . substr($content, 0, 100) . '...');
         } else {
             throw new \Exception('Non-text file, cannot process with AI: ' . $mimeType);
         }
@@ -344,42 +356,75 @@ class DashboardController extends Controller
             throw new \Exception('Content too short for meaningful summary: ' . strlen($content) . ' characters');
         }
 
-        Log::info('Calling HuggingFace API...');
-        
-        // Call HuggingFace API with better timeout and error handling
-        $response = Http::timeout(20)
-            ->withHeaders([
-                'Authorization' => 'Bearer ' . $this->hfToken,
-                'Content-Type' => 'application/json',
-            ])
-            ->post('https://api-inference.huggingface.co/models/facebook/bart-large-cnn', [
-                'inputs' => $content
-            ]);
+        // Try multiple models/approaches
+        $models = [
+            'facebook/bart-large-cnn',
+            'sshleifer/distilbart-cnn-12-6', // Faster, smaller model
+            'google/pegasus-xsum' // Alternative summarization model
+        ];
 
-        Log::info('HuggingFace API response status: ' . $response->status());
-        
-        if ($response->successful()) {
-            $result = $response->json();
-            Log::info('HuggingFace API response: ' . json_encode($result));
-            
-            if (isset($result[0]['summary_text'])) {
-                $summary = trim($result[0]['summary_text']);
-                return 'AI Summary: ' . $summary;
-            } elseif (isset($result['error'])) {
-                // Handle model loading or other API errors
-                $error = $result['error'];
-                if (strpos(strtolower($error), 'loading') !== false) {
-                    throw new \Exception('HuggingFace model is loading, try again in a moment');
+        foreach ($models as $index => $model) {
+            try {
+                Log::info('Trying model #' . ($index + 1) . ': ' . $model);
+                
+                // Test if content can be JSON encoded before sending
+                $testJson = json_encode(['inputs' => $content]);
+                if ($testJson === false) {
+                    throw new \Exception('Content cannot be JSON encoded: ' . json_last_error_msg());
                 }
-                throw new \Exception('HuggingFace API error: ' . $error);
-            } else {
-                throw new \Exception('Unexpected HuggingFace API response format');
+                
+                $timeout = ($index === 0) ? 15 : 25;
+                $response = Http::timeout($timeout)
+                    ->retry(2, 1000)
+                    ->withHeaders([
+                        'Authorization' => 'Bearer ' . $this->hfToken,
+                        'Content-Type' => 'application/json',
+                    ])
+                    ->post('https://api-inference.huggingface.co/models/' . $model, [
+                        'inputs' => $content,
+                        'options' => [
+                            'wait_for_model' => true,
+                            'use_cache' => false
+                        ]
+                    ]);
+
+                Log::info('Model ' . $model . ' response status: ' . $response->status());
+                
+                if ($response->successful()) {
+                    $result = $response->json();
+                    Log::info('Model ' . $model . ' response: ' . json_encode($result));
+                    
+                    if (isset($result[0]['summary_text'])) {
+                        $summary = trim($result[0]['summary_text']);
+                        Log::info('SUCCESS with model ' . $model);
+                        return 'AI Summary: ' . $summary;
+                    } elseif (isset($result['error'])) {
+                        $error = $result['error'];
+                        Log::warning('Model ' . $model . ' returned error: ' . $error);
+                        
+                        if (strpos(strtolower($error), 'loading') !== false && $index < count($models) - 1) {
+                            Log::info('Model loading, trying next model...');
+                            continue;
+                        }
+                        throw new \Exception('HuggingFace API error: ' . $error);
+                    }
+                } else {
+                    Log::warning('Model ' . $model . ' HTTP error: ' . $response->status() . ' - ' . $response->body());
+                    if ($index < count($models) - 1) {
+                        continue;
+                    }
+                }
+                
+            } catch (\Exception $e) {
+                Log::warning('Model ' . $model . ' failed: ' . $e->getMessage());
+                if ($index < count($models) - 1) {
+                    continue;
+                }
+                throw $e;
             }
-        } else {
-            $errorBody = $response->body();
-            Log::error('HuggingFace API failed: ' . $errorBody);
-            throw new \Exception('HuggingFace API request failed (HTTP ' . $response->status() . '): ' . $errorBody);
         }
+
+        throw new \Exception('All HuggingFace models failed or timed out');
     }
 
     /**

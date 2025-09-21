@@ -121,8 +121,60 @@
         });
     </script>
     
-    {{-- Upload script with improved UX --}}
+    {{-- Upload script with dynamic progress feedback --}}
     <script>
+        let progressInterval;
+        let currentStep = 0;
+        
+        const progressSteps = [
+            { text: 'Uploading to cloud storage...', dots: true },
+            { text: 'Extracting content...', dots: true },
+            { text: 'AI is thinking...', dots: true },
+            { text: 'Trying alternative approach...', dots: true },
+            { text: 'Hang in there, almost ready...', dots: true },
+            { text: 'Finalizing results...', dots: true }
+        ];
+
+        function updateProgress(step, customText = null) {
+            const feedback = document.getElementById('upload-feedback');
+            const text = customText || progressSteps[step]?.text || 'Processing...';
+            
+            // Clear any existing dot interval first
+            const existingDotInterval = feedback.getAttribute('data-dot-interval');
+            if (existingDotInterval) {
+                clearInterval(parseInt(existingDotInterval));
+                feedback.removeAttribute('data-dot-interval');
+            }
+            
+            if (progressSteps[step]?.dots && !customText) {
+                let dots = '';
+                const dotInterval = setInterval(() => {
+                    dots += '.';
+                    if (dots.length > 10) dots = '';
+                    feedback.textContent = text + dots;
+                }, 200);
+                
+                // Store interval for cleanup
+                feedback.setAttribute('data-dot-interval', dotInterval);
+            } else {
+                feedback.textContent = text;
+            }
+        }
+
+        function clearProgress() {
+            const feedback = document.getElementById('upload-feedback');
+            const dotInterval = feedback.getAttribute('data-dot-interval');
+            if (dotInterval) {
+                clearInterval(parseInt(dotInterval));
+                feedback.removeAttribute('data-dot-interval');
+            }
+            if (progressInterval) {
+                clearInterval(progressInterval);
+                progressInterval = null;
+            }
+            currentStep = 0;
+        }
+
         document.getElementById('ajax-upload-form').addEventListener('submit', function(e) {
             e.preventDefault();
 
@@ -134,20 +186,41 @@
             const btnSpinner = document.getElementById('btn-spinner');
             const fileInput = form.querySelector('input[type="file"]');
 
-            // Check if file is selected
+            // Validate file selection and type
             if (!fileInput.files.length) {
                 feedback.textContent = 'Please select a file first.';
                 feedback.className = 'mt-2 text-red-400';
                 return;
             }
 
-            // Update UI to uploading state
+            const file = fileInput.files[0];
+            const allowedTypes = ['txt', 'pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'];
+            const fileExt = file.name.split('.').pop().toLowerCase();
+            
+            if (!allowedTypes.includes(fileExt)) {
+                feedback.textContent = 'Please select a valid file type (TXT, PDF, DOC, DOCX, JPG, PNG).';
+                feedback.className = 'mt-2 text-red-400';
+                return;
+            }
+
+            // Start upload process with dynamic feedback
+            currentStep = 0;
             uploadBtn.disabled = true;
-            btnText.textContent = 'Uploading...';
+            btnText.textContent = 'Working...';
             btnSpinner.classList.remove('hidden');
             fileInput.disabled = true;
-            feedback.textContent = 'Uploading file and generating summary...';
             feedback.className = 'mt-2 text-blue-400';
+
+            // Step 1: Uploading
+            updateProgress(0);
+            
+            // Auto-progress through steps during upload
+            progressInterval = setInterval(() => {
+                currentStep++;
+                if (currentStep < progressSteps.length) {
+                    updateProgress(currentStep);
+                }
+            }, 3000); // Change step every 3 seconds
 
             fetch("{{ route('dashboard.upload') }}", {
                 method: "POST",
@@ -160,10 +233,12 @@
             })
             .then(res => res.json())
             .then(data => {
+                clearProgress();
+                
                 if(data.success) {
-                    // Success state
-                    feedback.textContent = data.message;
-                    feedback.className = 'mt-2 text-green-400';
+                    // Success with celebration - use updateProgress to properly clear dots
+                    updateProgress(null, 'Done! Your document has been uploaded and summarized!');
+                    feedback.className = 'mt-2 text-green-400 font-semibold';
 
                     // Update file list
                     const list = document.querySelector('#uploaded-files');
@@ -183,12 +258,24 @@
                     const li = document.createElement('li');
                     li.classList.add('p-4','bg-gray-700','rounded');
                     li.setAttribute('data-document-id', data.file.id);
+                    li.setAttribute('data-name', data.file.original_name);
+                    li.setAttribute('data-date', 'Just now');
+                    li.setAttribute('data-size', data.file.size);
+                    li.setAttribute('data-type', data.file.original_name.split('.').pop().toLowerCase());
                     
                     const truncatedSummary = data.file.summary.length > 60 ? data.file.summary.substring(0, 60) + '...' : data.file.summary;
                     
-                    li.innerHTML = `<strong class="text-white">${data.file.original_name}</strong>
+                    li.innerHTML = `<div class="flex justify-between items-start mb-2">
+                                        <strong class="text-white">${data.file.original_name}</strong>
+                                        <button class="delete-file-btn text-red-400 hover:text-red-300 transition-colors" data-document-id="${data.file.id}" data-filename="${data.file.original_name}">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                            </svg>
+                                        </button>
+                                    </div>
                                     <p class="text-gray-300 text-sm mt-1">
                                         <span class="text-gray-400">Size:</span> ${data.file.size} | 
+                                        <span class="text-gray-400">Type:</span> ${data.file.original_name.split('.').pop().toUpperCase()} |
                                         <span class="text-gray-400">Uploaded:</span> Just now
                                     </p>
                                     <p class="text-gray-300 mt-1">
@@ -207,6 +294,7 @@
                                         <p class="text-gray-200 text-sm leading-relaxed summary-full-text"></p>
                                     </div>
                                     <a href="${data.file.url}" target="_blank" class="text-blue-400 hover:underline mt-2 block transition-colors">View Document</a>`;
+                    
                     filesList.appendChild(li);
                     
                     // Reset form
@@ -216,21 +304,20 @@
                     setTimeout(() => {
                         document.getElementById('upload-form').style.display = 'none';
                         feedback.textContent = '';
-                    }, 3000);
+                    }, 4000);
                     
                 } else {
-                    // Error state
                     feedback.textContent = 'Upload failed: ' + (data.message || 'Unknown error');
                     feedback.className = 'mt-2 text-red-400';
                 }
             })
             .catch(err => {
+                clearProgress();
                 console.error('Upload error:', err);
                 feedback.textContent = 'Error uploading file: ' + err.message;
                 feedback.className = 'mt-2 text-red-400';
             })
             .finally(() => {
-                // Always reset button state
                 uploadBtn.disabled = false;
                 btnText.textContent = 'Upload';
                 btnSpinner.classList.add('hidden');
@@ -239,7 +326,7 @@
         });
     </script>
 
-    {{-- Summary generation script --}}
+    {{-- Summary and delete functionality --}}
     <script>
         document.addEventListener('click', function(e) {
             // Handle Generate Summary button
@@ -363,6 +450,57 @@
             listItems.forEach(item => filesList.appendChild(item));
         });
 
+        // Function to show summary details with smooth animation
+        function showSummaryDetails(listItem, summary) {
+            const summaryDetails = listItem.querySelector('.summary-details');
+            const summaryFullText = listItem.querySelector('.summary-full-text');
+            const viewBtn = listItem.querySelector('.view-summary-btn');
+            
+            // Set the full summary text
+            summaryFullText.textContent = summary;
+            
+            // Show with smooth animation
+            summaryDetails.classList.remove('hidden');
+            summaryDetails.style.maxHeight = '0px';
+            summaryDetails.style.opacity = '0';
+            summaryDetails.style.overflow = 'hidden';
+            summaryDetails.style.transition = 'all 0.3s ease-in-out';
+            
+            // Trigger animation
+            requestAnimationFrame(() => {
+                summaryDetails.style.maxHeight = summaryDetails.scrollHeight + 'px';
+                summaryDetails.style.opacity = '1';
+            });
+            
+            // Update button text
+            if (viewBtn) {
+                viewBtn.textContent = 'Hide Summary';
+            }
+        }
+
+        // Function to hide summary details with smooth animation
+        function hideSummaryDetails(listItem) {
+            const summaryDetails = listItem.querySelector('.summary-details');
+            const viewBtn = listItem.querySelector('.view-summary-btn');
+            
+            // Hide with smooth animation
+            summaryDetails.style.maxHeight = '0px';
+            summaryDetails.style.opacity = '0';
+            
+            setTimeout(() => {
+                summaryDetails.classList.add('hidden');
+                summaryDetails.style.maxHeight = '';
+                summaryDetails.style.opacity = '';
+                summaryDetails.style.overflow = '';
+                summaryDetails.style.transition = '';
+            }, 300);
+            
+            // Update button text
+            if (viewBtn) {
+                viewBtn.textContent = 'View Full Summary';
+            }
+        }
+
         // Delete file function
         function deleteFile(documentId, listItem) {
             const deleteBtn = listItem.querySelector('.delete-file-btn');
@@ -415,57 +553,6 @@
                 deleteBtn.innerHTML = originalIcon;
                 deleteBtn.disabled = false;
             });
-        }
-
-        // Function to show summary details with smooth animation
-        function showSummaryDetails(listItem, summary) {
-            const summaryDetails = listItem.querySelector('.summary-details');
-            const summaryFullText = listItem.querySelector('.summary-full-text');
-            const viewBtn = listItem.querySelector('.view-summary-btn');
-            
-            // Set the full summary text
-            summaryFullText.textContent = summary;
-            
-            // Show with smooth animation
-            summaryDetails.classList.remove('hidden');
-            summaryDetails.style.maxHeight = '0px';
-            summaryDetails.style.opacity = '0';
-            summaryDetails.style.overflow = 'hidden';
-            summaryDetails.style.transition = 'all 0.3s ease-in-out';
-            
-            // Trigger animation
-            requestAnimationFrame(() => {
-                summaryDetails.style.maxHeight = summaryDetails.scrollHeight + 'px';
-                summaryDetails.style.opacity = '1';
-            });
-            
-            // Update button text
-            if (viewBtn) {
-                viewBtn.textContent = 'Hide Summary';
-            }
-        }
-
-        // Function to hide summary details with smooth animation
-        function hideSummaryDetails(listItem) {
-            const summaryDetails = listItem.querySelector('.summary-details');
-            const viewBtn = listItem.querySelector('.view-summary-btn');
-            
-            // Hide with smooth animation
-            summaryDetails.style.maxHeight = '0px';
-            summaryDetails.style.opacity = '0';
-            
-            setTimeout(() => {
-                summaryDetails.classList.add('hidden');
-                summaryDetails.style.maxHeight = '';
-                summaryDetails.style.opacity = '';
-                summaryDetails.style.overflow = '';
-                summaryDetails.style.transition = '';
-            }, 300);
-            
-            // Update button text
-            if (viewBtn) {
-                viewBtn.textContent = 'View Full Summary';
-            }
         }
     </script>
 
