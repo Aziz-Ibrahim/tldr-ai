@@ -1,109 +1,235 @@
 <x-app-layout>
+
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-200 leading-tight">
+
+        <h2 class="font-semibold text-xl text-gray-900 dark:text-gray-200 leading-tight">
+
             Dashboard
+
         </h2>
+
     </x-slot>
+
+
 
     <div class="py-6 px-4 max-w-7xl mx-auto">
 
+
+
         {{-- Success message --}}
+
         @if(session('success'))
-            <div class="mb-4 p-4 bg-green-600 text-white rounded">
+
+            <div class="mb-4 p-4 bg-green-100 text-green-800 dark:bg-green-600 dark:text-white rounded">
+
                 {{ session('success') }}
+
             </div>
+
         @endif
+
+
 
         {{-- Show/hide upload form --}}
+
         <div class="mb-4">
-            <a href="#" id="show-upload-form" class="text-blue-400 hover:underline">Upload New Document</a>
-            <div id="upload-form" class="mt-2 p-4 bg-gray-800 rounded" style="display: none;">
+
+            <a href="#" id="show-upload-form" class="text-blue-600 dark:text-blue-400 hover:underline">Upload New Document</a>
+
+            <div id="upload-form" class="mt-2 p-4 bg-gray-100 dark:bg-gray-800 rounded" style="display: none;">
+
                 <form id="ajax-upload-form" enctype="multipart/form-data">
+
                     @csrf
-                    <input type="file" name="document" required class="mb-2 p-2 rounded text-black w-full">
-                    <button type="submit" id="upload-btn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-500 disabled:cursor-not-allowed transition-colors">
+
+                    <input type="file" name="document" required class="mb-2 p-2 rounded text-gray-900 dark:text-black w-full bg-white">
+
+                    <button type="submit" id="upload-btn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-500 disabled:cursor-not-allowed transition-colors">
+
                         <span id="btn-text">Upload</span>
+
                         <span id="btn-spinner" class="hidden ml-2">
+
                             <svg class="animate-spin h-4 w-4 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+
                             </svg>
+
                         </span>
+
                     </button>
+
                 </form>
+
             </div>
 
-            <div id="upload-feedback" class="mt-2 text-green-400"></div>
+
+
+            <div id="upload-feedback" class="mt-2 text-green-600 dark:text-green-400"></div>
+
         </div>
 
-        <h3 class="text-gray-200 text-lg font-semibold mb-4">Uploaded Documents</h3>
+
+
+        <h3 class="text-gray-900 dark:text-gray-200 text-lg font-semibold mb-4">Uploaded Documents</h3>
+
+
 
         {{-- Sorting and controls --}}
+
         <div class="mb-4 flex flex-wrap gap-2 items-center">
-            <span class="text-gray-400 text-sm">Sort by:</span>
-            <select id="sort-select" class="px-3 py-1 bg-gray-600 text-white text-sm rounded border border-gray-500 focus:border-blue-500">
+
+            <span class="text-gray-700 dark:text-gray-400 text-sm">Sort by:</span>
+
+            <select id="sort-select" class="px-3 py-1 bg-gray-100 dark:bg-gray-600 text-gray-900 dark:text-white text-sm rounded border border-gray-300 dark:border-gray-500 focus:border-blue-500">
+
                 <option value="date-desc">Date (Newest)</option>
+
                 <option value="date-asc">Date (Oldest)</option>
+
                 <option value="name-asc">Name (A-Z)</option>
+
                 <option value="name-desc">Name (Z-A)</option>
+
                 <option value="size-desc">Size (Largest)</option>
+
                 <option value="size-asc">Size (Smallest)</option>
+
                 <option value="type-asc">File Type</option>
+
             </select>
+
         </div>
 
+
+
         @if(count($files) === 0)
-            <p class="text-gray-400">No documents uploaded yet.</p>
+
+            <p class="text-gray-700 dark:text-gray-400">No documents uploaded yet.</p>
+
         @else
+
             <ul id="uploaded-files" class="space-y-4">
+
                 @foreach($files as $file)
-                    <li class="p-4 bg-gray-700 rounded" data-document-id="{{ $file['id'] }}" data-name="{{ $file['original_name'] }}" data-date="{{ $file['updated_at'] }}" data-size="{{ $file['size'] }}" data-type="{{ pathinfo($file['original_name'], PATHINFO_EXTENSION) }}">
+
+                    <li class="p-4 bg-gray-100 dark:bg-gray-700 rounded" 
+
+                        data-document-id="{{ $file['id'] }}" 
+
+                        data-name="{{ $file['original_name'] }}" 
+
+                        data-date="{{ $file['updated_at'] }}" 
+
+                        data-size="{{ $file['size'] }}" 
+
+                        data-type="{{ pathinfo($file['original_name'], PATHINFO_EXTENSION) }}">
+
+
+
                         <div class="flex justify-between items-start mb-2">
-                            <strong class="text-white">{{ $file['original_name'] }}</strong>
-                            <button class="delete-file-btn text-red-400 hover:text-red-300 transition-colors" data-document-id="{{ $file['id'] }}" data-filename="{{ $file['original_name'] }}">
+
+                            <strong class="text-gray-900 dark:text-white">{{ $file['original_name'] }}</strong>
+
+                            <button class="delete-file-btn text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 transition-colors" 
+
+                                    data-document-id="{{ $file['id'] }}" 
+
+                                    data-filename="{{ $file['original_name'] }}">
+
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+
                                 </svg>
+
                             </button>
+
                         </div>
-                        <p class="text-gray-300 text-sm mt-1">
-                            <span class="text-gray-400">Size:</span> {{ $file['size'] }} | 
-                            <span class="text-gray-400">Type:</span> {{ strtoupper(pathinfo($file['original_name'], PATHINFO_EXTENSION)) }} |
-                            <span class="text-gray-400">Uploaded:</span> {{ $file['updated_at'] }}
+
+
+
+                        <p class="text-gray-700 dark:text-gray-300 text-sm mt-1">
+
+                            <span class="text-gray-600 dark:text-gray-400">Size:</span> {{ $file['size'] }} | 
+
+                            <span class="text-gray-600 dark:text-gray-400">Type:</span> {{ strtoupper(pathinfo($file['original_name'], PATHINFO_EXTENSION)) }} |
+
+                            <span class="text-gray-600 dark:text-gray-400">Uploaded:</span> {{ $file['updated_at'] }}
+
                         </p>
-                        <p class="text-gray-300 mt-1">
+
+
+
+                        <p class="text-gray-700 dark:text-gray-300 mt-1">
+
                             <em>Summary:</em> 
+
                             <span class="summary-text">{{ Str::limit($file['summary'], 60) }}</span>
+
                             @if($file['summary'] === 'Click to generate summary')
+
                                 <button class="generate-summary-btn ml-2 px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors">
+
                                     Generate
+
                                 </button>
+
                             @else
+
                                 <button class="view-summary-btn ml-2 px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors" 
+
                                         data-summary="{{ str_replace('"', '&quot;', $file['summary']) }}">
+
                                     View Full Summary
+
                                 </button>
+
                             @endif
+
                         </p>
+
                         
+
                         {{-- Expandable summary section --}}
-                        <div class="summary-details hidden mt-3 p-3 bg-gray-600 rounded-lg border-l-4 border-green-500">
+
+                        <div class="summary-details hidden mt-3 p-3 bg-gray-50 dark:bg-gray-600 rounded-lg border-l-4 border-green-500">
+
                             <div class="flex justify-between items-start mb-2">
-                                <h4 class="text-white font-medium">Full Summary</h4>
-                                <button class="close-summary-btn text-gray-400 hover:text-white transition-colors">
+
+                                <h4 class="text-gray-900 dark:text-white font-medium">Full Summary</h4>
+
+                                <button class="close-summary-btn text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors">
+
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+
                                     </svg>
+
                                 </button>
+
                             </div>
-                            <p class="text-gray-200 text-sm leading-relaxed summary-full-text"></p>
+
+                            <p class="text-gray-800 dark:text-gray-200 text-sm leading-relaxed summary-full-text"></p>
+
                         </div>
+
                         
-                        <a href="{{ $file['url'] ?? '#' }}" target="_blank" class="text-blue-400 hover:underline mt-2 block transition-colors">View Document</a>
+
+                        <a href="{{ $file['url'] ?? '#' }}" target="_blank" class="text-blue-600 dark:text-blue-400 hover:underline mt-2 block transition-colors">View Document</a>
+
                     </li>
+
                 @endforeach
+
             </ul>
+
         @endif
+
     </div>
 
     {{-- JS for toggle form --}}
@@ -243,59 +369,76 @@
                     // Update file list
                     const list = document.querySelector('#uploaded-files');
                     const noFilesMsg = document.querySelector('p.text-gray-400');
-                    if(noFilesMsg && noFilesMsg.textContent.includes('No documents uploaded yet')) {
+                    if (noFilesMsg && noFilesMsg.textContent.includes('No documents uploaded yet')) {
                         noFilesMsg.remove();
                     }
-                    
+
                     let filesList = document.getElementById('uploaded-files');
-                    if(!filesList) {
+                    if (!filesList) {
                         filesList = document.createElement('ul');
                         filesList.id = 'uploaded-files';
                         filesList.className = 'space-y-4';
                         document.querySelector('.py-6').appendChild(filesList);
                     }
-                    
+
                     const li = document.createElement('li');
-                    li.classList.add('p-4','bg-gray-700','rounded');
+                    li.classList.add(
+                        'p-4',
+                        'rounded',
+                        'bg-white', 'dark:bg-gray-700',  // light + dark background
+                        'shadow'
+                    );
                     li.setAttribute('data-document-id', data.file.id);
                     li.setAttribute('data-name', data.file.original_name);
                     li.setAttribute('data-date', 'Just now');
                     li.setAttribute('data-size', data.file.size);
                     li.setAttribute('data-type', data.file.original_name.split('.').pop().toLowerCase());
-                    
-                    const truncatedSummary = data.file.summary.length > 60 ? data.file.summary.substring(0, 60) + '...' : data.file.summary;
-                    
-                    li.innerHTML = `<div class="flex justify-between items-start mb-2">
-                                        <strong class="text-white">${data.file.original_name}</strong>
-                                        <button class="delete-file-btn text-red-400 hover:text-red-300 transition-colors" data-document-id="${data.file.id}" data-filename="${data.file.original_name}">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                            </svg>
-                                        </button>
-                                    </div>
-                                    <p class="text-gray-300 text-sm mt-1">
-                                        <span class="text-gray-400">Size:</span> ${data.file.size} | 
-                                        <span class="text-gray-400">Type:</span> ${data.file.original_name.split('.').pop().toUpperCase()} |
-                                        <span class="text-gray-400">Uploaded:</span> Just now
-                                    </p>
-                                    <p class="text-gray-300 mt-1">
-                                        <em>Summary:</em> <span class="summary-text">${truncatedSummary}</span>
-                                        ${data.file.summary === 'Click to generate summary' ? '<button class="generate-summary-btn ml-2 px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors">Generate</button>' : '<button class="view-summary-btn ml-2 px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors" data-summary="' + data.file.summary.replace(/"/g, '&quot;') + '">View Full Summary</button>'}
-                                    </p>
-                                    <div class="summary-details hidden mt-3 p-3 bg-gray-600 rounded-lg border-l-4 border-green-500">
-                                        <div class="flex justify-between items-start mb-2">
-                                            <h4 class="text-white font-medium">Full Summary</h4>
-                                            <button class="close-summary-btn text-gray-400 hover:text-white transition-colors">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                                                </svg>
-                                            </button>
-                                        </div>
-                                        <p class="text-gray-200 text-sm leading-relaxed summary-full-text"></p>
-                                    </div>
-                                    <a href="${data.file.url}" target="_blank" class="text-blue-400 hover:underline mt-2 block transition-colors">View Document</a>`;
-                    
+
+                    const truncatedSummary =
+                        data.file.summary.length > 60
+                            ? data.file.summary.substring(0, 60) + '...'
+                            : data.file.summary;
+
+                    li.innerHTML = `
+                        <div class="flex justify-between items-start mb-2">
+                            <strong class="text-gray-900 dark:text-white">${data.file.original_name}</strong>
+                            <button class="delete-file-btn text-red-600 dark:text-red-400 hover:text-red-500 dark:hover:text-red-300 transition-colors" 
+                                    data-document-id="${data.file.id}" 
+                                    data-filename="${data.file.original_name}">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <p class="text-gray-700 dark:text-gray-300 text-sm mt-1">
+                            <span class="text-gray-500 dark:text-gray-400">Size:</span> ${data.file.size} | 
+                            <span class="text-gray-500 dark:text-gray-400">Type:</span> ${data.file.original_name.split('.').pop().toUpperCase()} |
+                            <span class="text-gray-500 dark:text-gray-400">Uploaded:</span> Just now
+                        </p>
+                        <p class="text-gray-700 dark:text-gray-300 mt-1">
+                            <em>Summary:</em> <span class="summary-text">${truncatedSummary}</span>
+                            ${
+                                data.file.summary === 'Click to generate summary'
+                                    ? `<button class="generate-summary-btn ml-2 px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors">Generate</button>`
+                                    : `<button class="view-summary-btn ml-2 px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors" data-summary="${data.file.summary.replace(/"/g, '&quot;')}">View Full Summary</button>`
+                            }
+                        </p>
+                        <div class="summary-details hidden mt-3 p-3 rounded-lg border-l-4 border-green-500 bg-gray-100 dark:bg-gray-600">
+                            <div class="flex justify-between items-start mb-2">
+                                <h4 class="text-gray-900 dark:text-white font-medium">Full Summary</h4>
+                                <button class="close-summary-btn text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <p class="text-gray-800 dark:text-gray-200 text-sm leading-relaxed summary-full-text"></p>
+                        </div>
+                        <a href="${data.file.url}" target="_blank" class="text-blue-600 dark:text-blue-400 hover:underline mt-2 block transition-colors">View Document</a>
+                    `;
+
                     filesList.appendChild(li);
+
                     
                     // Reset form
                     form.reset();
