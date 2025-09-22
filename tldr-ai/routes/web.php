@@ -1,7 +1,11 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\WelcomeController;
 use App\Http\Controllers\DashboardController;
+
+// Public routes (accessible without auth)
+Route::get('/', [WelcomeController::class, 'index'])->name('welcome');
 
 // Auth routes (login, register, etc.)
 require __DIR__.'/auth.php';
