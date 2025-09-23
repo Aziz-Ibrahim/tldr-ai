@@ -46,29 +46,47 @@
                 (!("color-theme" in localStorage) && window.matchMedia("(prefers-color-scheme: dark)").matches)
             ) {
                 document.documentElement.classList.add("dark");
-                document.getElementById("theme-toggle-dark-icon").classList.remove("hidden");
+                document.querySelectorAll("#theme-toggle-dark-icon, #theme-toggle-dark-icon-mobile")
+                    .forEach(el => el.classList.remove("hidden"));
             } else {
                 document.documentElement.classList.remove("dark");
-                document.getElementById("theme-toggle-light-icon").classList.remove("hidden");
+                document.querySelectorAll("#theme-toggle-light-icon, #theme-toggle-light-icon-mobile")
+                    .forEach(el => el.classList.remove("hidden"));
             }
 
-            const themeToggleBtn = document.getElementById("theme-toggle");
-            const darkIcon = document.getElementById("theme-toggle-dark-icon");
-            const lightIcon = document.getElementById("theme-toggle-light-icon");
+            function setupThemeToggle(toggleId, darkIconId, lightIconId) {
+                const btn = document.getElementById(toggleId);
+                const darkIcon = document.getElementById(darkIconId);
+                const lightIcon = document.getElementById(lightIconId);
 
-            themeToggleBtn.addEventListener("click", function () {
-                darkIcon.classList.toggle("hidden");
-                lightIcon.classList.toggle("hidden");
+                if (!btn) return;
 
-                if (document.documentElement.classList.contains("dark")) {
-                    document.documentElement.classList.remove("dark");
-                    localStorage.setItem("color-theme", "light");
-                } else {
-                    document.documentElement.classList.add("dark");
-                    localStorage.setItem("color-theme", "dark");
-                }
-            });
+                btn.addEventListener("click", function () {
+                    darkIcon.classList.toggle("hidden");
+                    lightIcon.classList.toggle("hidden");
+
+                    if (document.documentElement.classList.contains("dark")) {
+                        document.documentElement.classList.remove("dark");
+                        localStorage.setItem("color-theme", "light");
+                        // sync icons on both buttons
+                        document.querySelectorAll("#theme-toggle-dark-icon, #theme-toggle-dark-icon-mobile")
+                            .forEach(el => el.classList.add("hidden"));
+                        document.querySelectorAll("#theme-toggle-light-icon, #theme-toggle-light-icon-mobile")
+                            .forEach(el => el.classList.remove("hidden"));
+                    } else {
+                        document.documentElement.classList.add("dark");
+                        localStorage.setItem("color-theme", "dark");
+                        // sync icons on both buttons
+                        document.querySelectorAll("#theme-toggle-light-icon, #theme-toggle-light-icon-mobile")
+                            .forEach(el => el.classList.add("hidden"));
+                        document.querySelectorAll("#theme-toggle-dark-icon, #theme-toggle-dark-icon-mobile")
+                            .forEach(el => el.classList.remove("hidden"));
+                    }
+                });
+            }
+
+            setupThemeToggle("theme-toggle", "theme-toggle-dark-icon", "theme-toggle-light-icon");
+            setupThemeToggle("theme-toggle-mobile", "theme-toggle-dark-icon-mobile", "theme-toggle-light-icon-mobile");
         </script>
-
     </body>
 </html>

@@ -152,6 +152,21 @@
                     </x-responsive-nav-link>
                 </div>
             @endauth
+            {{-- Responsive Theme Toggle --}}
+            <div class="mt-3 px-4">
+                <button id="theme-toggle-mobile"
+                    @click="$dispatch('close'); open = false"
+                    class="w-full flex items-center justify-center px-4 py-2 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                    title="Toggle Dark/Light Mode">
+                    <svg id="theme-toggle-light-icon-mobile" class="hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 15a5 5 0 100-10 5 5 0 000 10z" />
+                    </svg>
+                    <svg id="theme-toggle-dark-icon-mobile" class="hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M17.293 13.293a8 8 0 11-10.586-10.586 8 8 0 0010.586 10.586z" clip-rule="evenodd" />
+                    </svg>
+                    <span class="ml-2">Toggle Theme</span>
+                </button>
+            </div>
         </div>
     </div>
 </nav>
