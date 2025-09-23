@@ -13,7 +13,12 @@ export default {
         extend: {
             fontFamily: {
                 sans: ['Figtree', ...defaultTheme.fontFamily.sans],
+                'tilt-neon': ['"Tilt Neon"', 'sans-serif'],
             },
+            colors: {
+                // Custom brand color for TLDR
+                'tldr-primary': '#4E888F',
+            }
         },
     },
 

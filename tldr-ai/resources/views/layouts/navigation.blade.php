@@ -4,8 +4,9 @@
             <div class="flex">
                 <div class="shrink-0 flex items-center">
                     <a href="{{ route('welcome') }}">
-                        {{-- Using your img element for the logo --}}
-                        <img src="{{ asset('images/tldr-ai-logo.svg') }}" alt="TLDR AI Logo" class="block h-9 w-auto">
+                        {{-- Using img element for the logo --}}
+                        <img src="{{ asset('images/tldr-ai-logo.svg') }}" alt="TLDR AI Logo" class="block h-9 w-auto dark:hidden">
+                        <img src="{{ asset('images/tldr-ai-logo-dark.svg') }}" alt="TLDR AI Logo" class="hidden h-9 w-auto dark:block">
                     </a>
                 </div>
 
