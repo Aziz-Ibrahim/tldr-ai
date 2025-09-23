@@ -7,6 +7,11 @@ use App\Http\Controllers\DashboardController;
 // Public routes (accessible without auth)
 Route::get('/', [WelcomeController::class, 'index'])->name('welcome');
 
+// About page
+Route::get('/about', function () {
+    return view('about');
+})->name('about');
+
 // Auth routes (login, register, etc.)
 require __DIR__.'/auth.php';
 
