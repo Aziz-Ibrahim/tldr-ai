@@ -5,7 +5,13 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <title>{{ config('app.name', 'Laravel') }}</title>
+        <!-- Basic SEO Meta Tags -->
+        <meta name="author" content="Aziz Ibrahim">
+        <meta name="description" content="TLDR AI is your intelligent shortcut to knowledge. We use cutting-edge AI to instantly summarize articles, reports, and documents, helping you read less and know more.">
+        <meta name="keywords" content="TLDR, AI, summary, summarizer, artificial intelligence, natural language processing, NLP, knowledge, efficiency, reports, articles">
+
+        <!-- Title -->
+        <title>{{ config('app.name', 'TLDR;AI') }}</title>
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
