@@ -23,9 +23,8 @@
         @include('layouts.navigation')
         <div class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-gray-100 dark:bg-gray-900">
             <div>
-                <a href="/">
-                    <x-application-logo class="w-20 h-20 fill-current text-gray-500" />
-                </a>
+                <img src="{{ asset('images/tldr-ai-logo.svg') }}" alt="TLDR AI Logo" class="mx-auto mb-6 h-32 block dark:hidden">
+                <img src="{{ asset('images/tldr-ai-logo-dark.svg') }}" alt="TLDR AI Logo" class="mx-auto mb-6 h-32 hidden dark:block">
             </div>
 
             <div class="w-full sm:max-w-md mt-6 px-6 py-4 bg-white dark:bg-gray-800 shadow-md overflow-hidden sm:rounded-lg">

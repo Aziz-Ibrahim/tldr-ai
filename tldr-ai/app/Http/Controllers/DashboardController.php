@@ -310,7 +310,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * Generate AI summary from file URL (IMPROVED WITH RETRY LOGIC)
+     * Generate AI summary from file URL (IMPROVED WITH PDF SUPPORT)
      */
     protected function generateSummaryFromUrl(string $fileUrl, string $mimeType): string
     {
@@ -326,30 +326,11 @@ class DashboardController extends Controller
             throw new \Exception('Could not fetch file content, HTTP status: ' . $response->status());
         }
 
-        $content = $response->body();
-        Log::info('File content fetched, length: ' . strlen($content) . ' bytes');
+        $rawContent = $response->body();
+        Log::info('File content fetched, length: ' . strlen($rawContent) . ' bytes');
         
-        // Clean and limit content for text files
-        if (strpos($mimeType, 'text/') === 0) {
-            $content = trim($content);
-            
-            // Fix UTF-8 encoding issues
-            $content = mb_convert_encoding($content, 'UTF-8', 'UTF-8');
-            $content = mb_scrub($content, 'UTF-8'); // Remove invalid sequences
-            
-            // Remove any remaining problematic characters
-            $content = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $content);
-            // Use iconv for better UTF-8 cleaning (revert to more reliable approach)
-            $content = iconv('UTF-8', 'UTF-8//IGNORE', $content);
-            $content = preg_replace('/[^\x20-\x7E\t\n\r]/', '', $content); // Keep only printable ASCII + tabs/newlines
-            
-            // Use more content for better summaries
-            $content = substr($content, 0, 1000);
-            Log::info('Text content prepared for AI, length: ' . strlen($content) . ' characters');
-            Log::info('Content preview: ' . substr($content, 0, 100) . '...');
-        } else {
-            throw new \Exception('Non-text file, cannot process with AI: ' . $mimeType);
-        }
+        // Extract text based on file type
+        $content = $this->extractTextContent($rawContent, $mimeType);
         
         // Skip if content is too short
         if (strlen(trim($content)) < 50) {
@@ -359,8 +340,8 @@ class DashboardController extends Controller
         // Try multiple models/approaches
         $models = [
             'facebook/bart-large-cnn',
-            'sshleifer/distilbart-cnn-12-6', // Faster, smaller model
-            'google/pegasus-xsum' // Alternative summarization model
+            'sshleifer/distilbart-cnn-12-6',
+            'google/pegasus-xsum'
         ];
 
         foreach ($models as $index => $model) {
@@ -425,6 +406,159 @@ class DashboardController extends Controller
         }
 
         throw new \Exception('All HuggingFace models failed or timed out');
+    }
+
+    /**
+     * Extract text content from different file types
+     */
+    protected function extractTextContent(string $rawContent, string $mimeType): string
+    {
+        Log::info('Extracting text from MIME type: ' . $mimeType);
+        
+        switch ($mimeType) {
+            case 'application/pdf':
+                return $this->extractPdfText($rawContent);
+            
+            case 'text/plain':
+                return $this->cleanTextContent($rawContent);
+            
+            case 'application/msword':
+            case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+                // For now, treat as binary and try to extract readable parts
+                return $this->extractReadableText($rawContent);
+            
+            default:
+                if (strpos($mimeType, 'text/') === 0) {
+                    return $this->cleanTextContent($rawContent);
+                }
+                throw new \Exception('Unsupported file type for text extraction: ' . $mimeType);
+        }
+    }
+
+    /**
+     * Extract text from PDF (basic approach)
+     */
+    protected function extractPdfText(string $pdfContent): string
+    {
+        Log::info('Attempting PDF text extraction');
+        
+        // Basic PDF text extraction using regex patterns
+        // This is a simple approach - for production, consider using smalot/pdfparser package
+        
+        $text = '';
+        
+        // Look for text objects in PDF
+        if (preg_match_all('/\((.*?)\)/', $pdfContent, $matches)) {
+            foreach ($matches[1] as $match) {
+                // Clean up the extracted text
+                $cleanText = $this->cleanPdfText($match);
+                if (strlen($cleanText) > 2) {
+                    $text .= $cleanText . ' ';
+                }
+            }
+        }
+        
+        // Alternative: look for text between BT and ET markers
+        if (strlen($text) < 50 && preg_match_all('/BT\s+(.*?)\s+ET/s', $pdfContent, $btMatches)) {
+            foreach ($btMatches[1] as $btMatch) {
+                if (preg_match_all('/\((.*?)\)/', $btMatch, $textMatches)) {
+                    foreach ($textMatches[1] as $textMatch) {
+                        $cleanText = $this->cleanPdfText($textMatch);
+                        if (strlen($cleanText) > 2) {
+                            $text .= $cleanText . ' ';
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Fallback: extract any readable ASCII text
+        if (strlen($text) < 50) {
+            $text = $this->extractReadableText($pdfContent);
+        }
+        
+        $text = $this->cleanTextContent($text);
+        
+        Log::info('PDF text extraction result: ' . strlen($text) . ' characters');
+        Log::info('PDF text preview: ' . substr($text, 0, 200) . '...');
+        
+        if (strlen($text) < 50) {
+            throw new \Exception('Could not extract sufficient text from PDF');
+        }
+        
+        return substr($text, 0, 1000);
+    }
+
+    /**
+     * Clean PDF text extraction results
+     */
+    protected function cleanPdfText(string $text): string
+    {
+        // Remove PDF escape sequences
+        $text = str_replace(['\\r', '\\n', '\\t'], [' ', ' ', ' '], $text);
+        $text = preg_replace('/\\\\[0-9]{1,3}/', '', $text); // Remove octal sequences
+        $text = str_replace(['\\(', '\\)', '\\\\'], ['(', ')', '\\'], $text);
+        
+        return trim($text);
+    }
+
+    /**
+     * Extract readable text from binary content
+     */
+    protected function extractReadableText(string $content): string
+    {
+        // Extract sequences of printable characters
+        $text = '';
+        if (preg_match_all('/[a-zA-Z0-9\s\.,\!\?\-\:\;]{10,}/', $content, $matches)) {
+            foreach ($matches[0] as $match) {
+                $clean = trim($match);
+                if (strlen($clean) > 10) {
+                    $text .= $clean . ' ';
+                }
+            }
+        }
+        
+        return $text;
+    }
+
+    /**
+     * Clean text content for API consumption (ENHANCED)
+     */
+    protected function cleanTextContent(string $content): string
+    {
+        $content = trim($content);
+        
+        // More aggressive UTF-8 cleaning for PDF content
+        $content = mb_convert_encoding($content, 'UTF-8', 'UTF-8');
+        $content = mb_scrub($content, 'UTF-8');
+        
+        // Remove control characters and non-printable characters
+        $content = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $content);
+        
+        // Use iconv with more aggressive cleaning
+        $content = iconv('UTF-8', 'UTF-8//IGNORE', $content);
+        
+        // For PDF content, be more aggressive - keep only basic ASCII and common punctuation
+        $content = preg_replace('/[^\x20-\x7E\s]/', ' ', $content);
+        
+        // Clean up multiple spaces
+        $content = preg_replace('/\s+/', ' ', $content);
+        
+        // Final test - if still can't JSON encode, use base64 fallback approach
+        $testJson = json_encode($content);
+        if ($testJson === false) {
+            Log::warning('Content still not JSON encodable, using ASCII-only fallback');
+            // Keep only letters, numbers, basic punctuation and spaces
+            $content = preg_replace('/[^a-zA-Z0-9\s\.\,\!\?\-\:\;\(\)]/', ' ', $content);
+            $content = preg_replace('/\s+/', ' ', $content);
+        }
+        
+        // Limit content length
+        $content = substr(trim($content), 0, 1000);
+        Log::info('Text content prepared for AI, length: ' . strlen($content) . ' characters');
+        Log::info('Content preview: ' . substr($content, 0, 100) . '...');
+        
+        return $content;
     }
 
     /**
