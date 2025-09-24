@@ -471,15 +471,23 @@ class DashboardController extends Controller
         
         switch ($mimeType) {
             case 'application/pdf':
-                return $this->extractPdfText($rawContent);
+                $extractedText = $this->extractPdfText($rawContent);
+                // Validate quality before returning
+                if (!$this->isTextQualityAcceptable($extractedText)) {
+                    throw new \Exception('PDF text extraction failed - content appears to be encoded or corrupted');
+                }
+                return $extractedText;
             
             case 'text/plain':
                 return $this->cleanTextContent($rawContent);
             
             case 'application/msword':
             case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-                // For now, treat as binary and try to extract readable parts
-                return $this->extractReadableText($rawContent);
+                $extractedText = $this->extractReadableText($rawContent);
+                if (!$this->isTextQualityAcceptable($extractedText)) {
+                    throw new \Exception('Document text extraction failed - unable to read content');
+                }
+                return $extractedText;
             
             default:
                 if (strpos($mimeType, 'text/') === 0) {
@@ -490,7 +498,44 @@ class DashboardController extends Controller
     }
 
     /**
-     * Extract text from PDF
+     * Check if extracted text quality is acceptable for AI processing
+     */
+    protected function isTextQualityAcceptable(string $text): bool
+    {
+        if (empty($text) || strlen(trim($text)) < 10) {
+            return false;
+        }
+
+        // Count readable vs unreadable characters
+        $readableChars = preg_match_all('/[a-zA-Z0-9\s\.\,\!\?\-\:\;\(\)]/', $text);
+        $totalChars = strlen($text);
+        
+        if ($totalChars == 0) return false;
+        
+        $readableRatio = $readableChars / $totalChars;
+        
+        Log::info('Text quality check - Readable ratio: ' . number_format($readableRatio, 3));
+        Log::info('Text quality check - Sample: ' . substr($text, 0, 100) . '...');
+        
+        // Require at least 60% readable characters
+        if ($readableRatio < 0.6) {
+            Log::warning('Text quality rejected - readable ratio too low: ' . $readableRatio);
+            return false;
+        }
+        
+        // Check for actual words (not just random characters)
+        $wordCount = preg_match_all('/\b[a-zA-Z]{2,}\b/', $text);
+        if ($wordCount < 3) {
+            Log::warning('Text quality rejected - not enough recognizable words: ' . $wordCount);
+            return false;
+        }
+        
+        Log::info('Text quality accepted - ' . $wordCount . ' words found');
+        return true;
+    }
+
+    /**
+     * Extract text from PDF (improved approach)
      */
     protected function extractPdfText(string $pdfContent): string
     {
