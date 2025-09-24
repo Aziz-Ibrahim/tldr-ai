@@ -1,1 +1,0 @@
-web: heroku-php-apache2 tldr-ai/public/
