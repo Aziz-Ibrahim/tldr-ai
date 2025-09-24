@@ -242,6 +242,60 @@ class DashboardController extends Controller
     }
 
     /**
+     * Delete a document
+     */
+    public function delete(Request $request)
+    {
+        try {
+            $documentId = $request->input('document_id');
+            
+            if (!$documentId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Document ID is required'
+                ], 400);
+            }
+
+            // Find the document (ensure user owns it)
+            $document = Document::where('id', $documentId)
+                              ->where('user_id', Auth::id())
+                              ->first();
+
+            if (!$document) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Document not found'
+                ], 404);
+            }
+
+            // Delete from Supabase
+            try {
+                $this->supabase->deleteFile($this->bucket, $document->file_path);
+                Log::info('File deleted from Supabase: ' . $document->file_path);
+            } catch (\Exception $e) {
+                Log::warning('Failed to delete from Supabase (continuing anyway): ' . $e->getMessage());
+                // Continue with database deletion even if Supabase deletion fails
+            }
+
+            // Delete from database
+            $document->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Document deleted successfully'
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::error('Delete error: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete document: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Generate summary and save to database
      */
     protected function generateAndSaveSummary(Document $document): string
@@ -264,7 +318,7 @@ class DashboardController extends Controller
             Log::error('Summary generation failed for document ' . $document->id . ': ' . $e->getMessage());
             
             // Save fallback summary
-            $fallbackSummary = 'Summary generation failed. File: ' . $document->filename;
+            $fallbackSummary = 'Unable to extract readable text from this file type.';
             $document->update([
                 'summary' => $fallbackSummary,
                 'summary_generated' => true,
@@ -436,57 +490,101 @@ class DashboardController extends Controller
     }
 
     /**
-     * Extract text from PDF (basic approach)
+     * Extract text from PDF
      */
     protected function extractPdfText(string $pdfContent): string
     {
         Log::info('Attempting PDF text extraction');
         
-        // Basic PDF text extraction using regex patterns
-        // This is a simple approach - for production, consider using smalot/pdfparser package
-        
         $text = '';
         
-        // Look for text objects in PDF
-        if (preg_match_all('/\((.*?)\)/', $pdfContent, $matches)) {
+        // Method 1: Look for readable text patterns (improved)
+        if (preg_match_all('/\(([^)]+)\)/', $pdfContent, $matches)) {
             foreach ($matches[1] as $match) {
-                // Clean up the extracted text
                 $cleanText = $this->cleanPdfText($match);
-                if (strlen($cleanText) > 2) {
+                // Only include text that has actual readable content
+                if (strlen($cleanText) > 3 && preg_match('/[a-zA-Z]{2,}/', $cleanText)) {
                     $text .= $cleanText . ' ';
                 }
             }
         }
         
-        // Alternative: look for text between BT and ET markers
-        if (strlen($text) < 50 && preg_match_all('/BT\s+(.*?)\s+ET/s', $pdfContent, $btMatches)) {
-            foreach ($btMatches[1] as $btMatch) {
-                if (preg_match_all('/\((.*?)\)/', $btMatch, $textMatches)) {
-                    foreach ($textMatches[1] as $textMatch) {
-                        $cleanText = $this->cleanPdfText($textMatch);
-                        if (strlen($cleanText) > 2) {
-                            $text .= $cleanText . ' ';
-                        }
+        // Method 2: Look for text objects with better filtering
+        if (strlen($text) < 100) {
+            // Look for text between quotes or parentheses with stricter filtering
+            if (preg_match_all('/"([^"]+)"/', $pdfContent, $quoteMatches)) {
+                foreach ($quoteMatches[1] as $match) {
+                    $cleanText = trim($match);
+                    if (strlen($cleanText) > 3 && preg_match('/[a-zA-Z]{2,}/', $cleanText)) {
+                        $text .= $cleanText . ' ';
                     }
                 }
             }
         }
         
-        // Fallback: extract any readable ASCII text
-        if (strlen($text) < 50) {
-            $text = $this->extractReadableText($pdfContent);
+        // Method 3: Extract readable ASCII sequences (more selective)
+        if (strlen($text) < 100) {
+            // Look for sequences of readable text (letters, numbers, basic punctuation)
+            if (preg_match_all('/[a-zA-Z][a-zA-Z0-9\s\.\,\!\?\-\:\;]{5,}[a-zA-Z0-9]/', $pdfContent, $readableMatches)) {
+                foreach ($readableMatches[0] as $match) {
+                    $cleanText = trim($match);
+                    // Skip if it looks like random characters or encoding
+                    if (strlen($cleanText) > 10 && !preg_match('/[^\x20-\x7E]/', $cleanText)) {
+                        $text .= $cleanText . ' ';
+                    }
+                }
+            }
         }
         
+        // Method 4: Fallback - extract any meaningful words
+        if (strlen($text) < 50) {
+            // Look for individual words and combine them
+            if (preg_match_all('/\b[a-zA-Z]{3,}\b/', $pdfContent, $wordMatches)) {
+                $words = array_unique($wordMatches[0]);
+                // Only use words that look real (not random characters)
+                $validWords = array_filter($words, function($word) {
+                    return strlen($word) >= 3 && 
+                           strlen($word) <= 15 && 
+                           !preg_match('/^[A-Z]{4,}$/', $word) && // Skip all caps sequences
+                           preg_match('/[aeiou]/i', $word); // Must contain vowels
+                });
+                
+                if (count($validWords) > 5) {
+                    $text = implode(' ', array_slice($validWords, 0, 50));
+                }
+            }
+        }
+        
+        // Clean and validate the extracted text
         $text = $this->cleanTextContent($text);
         
         Log::info('PDF text extraction result: ' . strlen($text) . ' characters');
         Log::info('PDF text preview: ' . substr($text, 0, 200) . '...');
         
-        if (strlen($text) < 50) {
-            throw new \Exception('Could not extract sufficient text from PDF');
+        if (strlen($text) < 20) {
+            throw new \Exception('Could not extract meaningful text from PDF - may be image-based or encoded');
+        }
+        
+        // Final validation - check if text is mostly readable
+        $readableRatio = $this->calculateReadableRatio($text);
+        if ($readableRatio < 0.7) {
+            throw new \Exception('Extracted text contains too many non-readable characters (ratio: ' . $readableRatio . ')');
         }
         
         return substr($text, 0, 1000);
+    }
+
+    /**
+     * Calculate ratio of readable characters in text
+     */
+    protected function calculateReadableRatio(string $text): float
+    {
+        if (empty($text)) return 0;
+        
+        $totalChars = strlen($text);
+        $readableChars = strlen(preg_replace('/[^a-zA-Z0-9\s\.\,\!\?\-\:\;]/', '', $text));
+        
+        return $readableChars / $totalChars;
     }
 
     /**
@@ -598,60 +696,6 @@ class DashboardController extends Controller
             
         } catch (\Exception $e) {
             return 'File uploaded successfully. Preview generation failed.';
-        }
-    }
-
-    /**
-     * Delete a document
-     */
-    public function delete(Request $request)
-    {
-        try {
-            $documentId = $request->input('document_id');
-            
-            if (!$documentId) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Document ID is required'
-                ], 400);
-            }
-
-            // Find the document (ensure user owns it)
-            $document = Document::where('id', $documentId)
-                              ->where('user_id', Auth::id())
-                              ->first();
-
-            if (!$document) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Document not found'
-                ], 404);
-            }
-
-            // Delete from Supabase
-            try {
-                $this->supabase->deleteFile($this->bucket, $document->file_path);
-                Log::info('File deleted from Supabase: ' . $document->file_path);
-            } catch (\Exception $e) {
-                Log::warning('Failed to delete from Supabase (continuing anyway): ' . $e->getMessage());
-                // Continue with database deletion even if Supabase deletion fails
-            }
-
-            // Delete from database
-            $document->delete();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Document deleted successfully'
-            ]);
-            
-        } catch (\Exception $e) {
-            Log::error('Delete error: ' . $e->getMessage());
-            
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to delete document: ' . $e->getMessage()
-            ], 500);
         }
     }
 
