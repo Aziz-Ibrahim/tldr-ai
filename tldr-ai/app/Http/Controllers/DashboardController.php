@@ -506,31 +506,54 @@ class DashboardController extends Controller
             return false;
         }
 
-        // Count readable vs unreadable characters
-        $readableChars = preg_match_all('/[a-zA-Z0-9\s\.\,\!\?\-\:\;\(\)]/', $text);
+        // Count only actual letters and numbers as readable (not punctuation/spaces)
+        $letterCount = preg_match_all('/[a-zA-Z]/', $text);
         $totalChars = strlen($text);
         
         if ($totalChars == 0) return false;
         
-        $readableRatio = $readableChars / $totalChars;
+        $letterRatio = $letterCount / $totalChars;
         
-        Log::info('Text quality check - Readable ratio: ' . number_format($readableRatio, 3));
+        // Check for suspicious character sequences (common in corrupted PDFs)
+        $suspiciousChars = preg_match_all('/[^\x20-\x7E]/', $text); // Non-printable ASCII
+        $suspiciousRatio = $suspiciousChars / $totalChars;
+        
+        Log::info('Text quality check - Letter ratio: ' . number_format($letterRatio, 3));
+        Log::info('Text quality check - Suspicious character ratio: ' . number_format($suspiciousRatio, 3));
         Log::info('Text quality check - Sample: ' . substr($text, 0, 100) . '...');
         
-        // Require at least 60% readable characters
-        if ($readableRatio < 0.6) {
-            Log::warning('Text quality rejected - readable ratio too low: ' . $readableRatio);
+        // Require at least 40% actual letters
+        if ($letterRatio < 0.4) {
+            Log::warning('Text quality rejected - letter ratio too low: ' . $letterRatio);
             return false;
         }
         
-        // Check for actual words (not just random characters)
-        $wordCount = preg_match_all('/\b[a-zA-Z]{2,}\b/', $text);
-        if ($wordCount < 3) {
-            Log::warning('Text quality rejected - not enough recognizable words: ' . $wordCount);
+        // Reject if more than 20% suspicious/non-printable characters
+        if ($suspiciousRatio > 0.2) {
+            Log::warning('Text quality rejected - too many suspicious characters: ' . $suspiciousRatio);
             return false;
         }
         
-        Log::info('Text quality accepted - ' . $wordCount . ' words found');
+        // Check for actual dictionary-like words (3+ letters with vowels)
+        $realWords = [];
+        if (preg_match_all('/\b[a-zA-Z]{3,}\b/', $text, $matches)) {
+            foreach ($matches[0] as $word) {
+                // Word must contain at least one vowel and be reasonable length
+                if (preg_match('/[aeiouAEIOU]/', $word) && strlen($word) <= 20) {
+                    $realWords[] = $word;
+                }
+            }
+        }
+        
+        $realWordCount = count($realWords);
+        Log::info('Text quality check - Real words found: ' . $realWordCount);
+        
+        if ($realWordCount < 5) {
+            Log::warning('Text quality rejected - not enough real words: ' . $realWordCount);
+            return false;
+        }
+        
+        Log::info('Text quality accepted - ' . $realWordCount . ' real words, letter ratio: ' . number_format($letterRatio, 3));
         return true;
     }
 
