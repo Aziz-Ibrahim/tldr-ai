@@ -6,5 +6,6 @@ $vendorDir = dirname(__DIR__);
 $baseDir = dirname($vendorDir);
 
 return array(
+    'Smalot\\PdfParser\\' => array($vendorDir . '/smalot/pdfparser/src'),
     '' => array($vendorDir . '/supabase/supabase-php/src', $vendorDir . '/supabase/storage-php/src', $vendorDir . '/supabase/functions-php/src'),
 );

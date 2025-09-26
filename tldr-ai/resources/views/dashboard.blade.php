@@ -1,253 +1,312 @@
 <x-app-layout>
-
     <x-slot name="header">
-
-        <h2 class="font-semibold text-xl text-gray-900 dark:text-gray-200 leading-tight">
-
+        <h2 class="font-semibold text-xl text-gray-200 leading-tight">
             Dashboard
-
         </h2>
-
     </x-slot>
-
-
 
     <div class="py-6 px-4 max-w-7xl mx-auto">
 
-
+        {{-- Security Warning --}}
+        <div class="mb-6 p-4 border border-yellow-600 rounded-lg">
+            <div class="flex items-center mb-2">
+                <svg class="w-5 h-5 text-yellow-200 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L5.268 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                </svg>
+                <h3 class="text-yellow-100 font-medium">Privacy Notice</h3>
+            </div>
+            <p class="text-yellow-100 text-sm">
+                <strong>Do not upload or input sensitive information</strong> such as personal documents, financial records, passwords, 
+                medical information, or confidential business data. This service processes content through external AI services 
+                and stores summaries in our database. Use only non-sensitive content for summarization.
+            </p>
+        </div>
 
         {{-- Success message --}}
-
         @if(session('success'))
-
-            <div class="mb-4 p-4 bg-green-100 text-green-800 dark:bg-green-600 dark:text-white rounded">
-
+            <div class="mb-4 p-4 bg-green-600 text-white rounded">
                 {{ session('success') }}
-
             </div>
-
         @endif
-
-
 
         {{-- Show/hide upload form --}}
-
         <div class="mb-4">
-
-            <a href="#" id="show-upload-form" class="text-blue-600 dark:text-blue-400 hover:underline">Upload New Document</a>
-
-            <div id="upload-form" class="mt-2 p-4 bg-gray-100 dark:bg-gray-800 rounded" style="display: none;">
-
-                <form id="ajax-upload-form" enctype="multipart/form-data">
-
+            <div class="flex flex-wrap gap-4 mb-2">
+                <a href="#" id="show-text-input" class="text-blue-400 hover:underline font-medium">📝 Write or Paste Text</a>
+                <a href="#" id="show-upload-form" class="text-blue-400 hover:underline">📁 Upload Document</a>
+            </div>
+            
+            {{-- Direct text input form --}}
+            <div id="text-input-form" class="mt-2 p-4 bg-gray-800 rounded" style="display: none;">
+                <form id="ajax-text-form">
                     @csrf
-
-                    <input type="file" name="document" required class="mb-2 p-2 rounded text-gray-900 dark:text-black w-full bg-white">
-
-                    <button type="submit" id="upload-btn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-500 disabled:cursor-not-allowed transition-colors">
-
-                        <span id="btn-text">Upload</span>
-
-                        <span id="btn-spinner" class="hidden ml-2">
-
-                            <svg class="animate-spin h-4 w-4 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-
-                            </svg>
-
-                        </span>
-
-                    </button>
-
+                    <textarea name="text_content" required class="w-full h-32 p-3 rounded bg-gray-700 text-white border border-gray-600 focus:border-blue-500" 
+                              placeholder="Paste your text here or write directly..."></textarea>
+                    <div class="flex justify-between items-center mt-2">
+                        <small class="text-gray-400">Direct text gets the best AI summaries</small>
+                        <button type="submit" id="text-btn" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-500 disabled:cursor-not-allowed transition-colors">
+                            <span id="text-btn-text">Summarize</span>
+                            <span id="text-btn-spinner" class="hidden ml-2">
+                                <svg class="animate-spin h-4 w-4 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            </span>
+                        </button>
+                    </div>
                 </form>
-
             </div>
 
+            {{-- File upload form --}}
+            <div id="upload-form" class="mt-2 p-4 bg-gray-800 rounded" style="display: none;">
+                <form id="ajax-upload-form" enctype="multipart/form-data">
+                    @csrf
+                    <div class="mb-2">
+                        <input type="file" name="document" required accept=".txt,.pdf,.doc,.docx" 
+                               class="mb-2 p-2 rounded text-black w-full file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                        <small class="text-gray-400 block">Supported: TXT, PDF, DOC, DOCX (max 10MB)</small>
+                    </div>
+                    <button type="submit" id="upload-btn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-500 disabled:cursor-not-allowed transition-colors">
+                        <span id="btn-text">Upload</span>
+                        <span id="btn-spinner" class="hidden ml-2">
+                            <svg class="animate-spin h-4 w-4 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        </span>
+                    </button>
+                </form>
+            </div>
 
-
-            <div id="upload-feedback" class="mt-2 text-green-600 dark:text-green-400"></div>
-
+            <div id="upload-feedback" class="mt-2 text-green-400"></div>
         </div>
 
-
-
-        <h3 class="text-gray-900 dark:text-gray-200 text-lg font-semibold mb-4">Uploaded Documents</h3>
-
-
+        <h3 class="text-gray-200 text-lg font-semibold mb-4">Uploaded Documents</h3>
 
         {{-- Sorting and controls --}}
-
         <div class="mb-4 flex flex-wrap gap-2 items-center">
-
-            <span class="text-gray-700 dark:text-gray-400 text-sm">Sort by:</span>
-
-            <select id="sort-select" class="px-3 py-1 bg-gray-100 dark:bg-gray-600 text-gray-900 dark:text-white text-sm rounded border border-gray-300 dark:border-gray-500 focus:border-blue-500">
-
+            <span class="text-gray-400 text-sm">Sort by:</span>
+            <select id="sort-select" class="px-3 py-1 bg-gray-600 text-white text-sm rounded border border-gray-500 focus:border-blue-500">
                 <option value="date-desc">Date (Newest)</option>
-
                 <option value="date-asc">Date (Oldest)</option>
-
                 <option value="name-asc">Name (A-Z)</option>
-
                 <option value="name-desc">Name (Z-A)</option>
-
                 <option value="size-desc">Size (Largest)</option>
-
                 <option value="size-asc">Size (Smallest)</option>
-
                 <option value="type-asc">File Type</option>
-
             </select>
-
         </div>
 
-
-
         @if(count($files) === 0)
-
-            <p class="text-gray-700 dark:text-gray-400">No documents uploaded yet.</p>
-
+            <p class="text-gray-400">No documents uploaded yet.</p>
         @else
-
             <ul id="uploaded-files" class="space-y-4">
-
                 @foreach($files as $file)
-
-                    <li class="p-4 bg-gray-100 dark:bg-gray-700 rounded" 
-
-                        data-document-id="{{ $file['id'] }}" 
-
-                        data-name="{{ $file['original_name'] }}" 
-
-                        data-date="{{ $file['updated_at'] }}" 
-
-                        data-size="{{ $file['size'] }}" 
-
-                        data-type="{{ pathinfo($file['original_name'], PATHINFO_EXTENSION) }}">
-
-
-
+                    <li class="p-4 bg-gray-700 rounded" data-document-id="{{ $file['id'] }}" data-name="{{ $file['original_name'] }}" data-date="{{ $file['updated_at'] }}" data-size="{{ $file['size'] }}" data-type="{{ pathinfo($file['original_name'], PATHINFO_EXTENSION) }}">
                         <div class="flex justify-between items-start mb-2">
-
-                            <strong class="text-gray-900 dark:text-white">{{ $file['original_name'] }}</strong>
-
-                            <button class="delete-file-btn text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 transition-colors" 
-
-                                    data-document-id="{{ $file['id'] }}" 
-
-                                    data-filename="{{ $file['original_name'] }}">
-
+                            <strong class="text-white">{{ $file['original_name'] }}</strong>
+                            <button class="delete-file-btn text-red-400 hover:text-red-300 transition-colors" data-document-id="{{ $file['id'] }}" data-filename="{{ $file['original_name'] }}">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-
                                 </svg>
-
                             </button>
-
                         </div>
-
-
-
-                        <p class="text-gray-700 dark:text-gray-300 text-sm mt-1">
-
-                            <span class="text-gray-600 dark:text-gray-400">Size:</span> {{ $file['size'] }} | 
-
-                            <span class="text-gray-600 dark:text-gray-400">Type:</span> {{ strtoupper(pathinfo($file['original_name'], PATHINFO_EXTENSION)) }} |
-
-                            <span class="text-gray-600 dark:text-gray-400">Uploaded:</span> {{ $file['updated_at'] }}
-
+                        <p class="text-gray-300 text-sm mt-1">
+                            <span class="text-gray-400">Size:</span> {{ $file['size'] }} | 
+                            <span class="text-gray-400">Type:</span> {{ strtoupper(pathinfo($file['original_name'], PATHINFO_EXTENSION)) }} |
+                            <span class="text-gray-400">Uploaded:</span> {{ $file['updated_at'] }}
                         </p>
-
-
-
-                        <p class="text-gray-700 dark:text-gray-300 mt-1">
-
+                        <p class="text-gray-300 mt-1">
                             <em>Summary:</em> 
-
                             <span class="summary-text">{{ Str::limit($file['summary'], 60) }}</span>
-
                             @if($file['summary'] === 'Click to generate summary')
-
                                 <button class="generate-summary-btn ml-2 px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors">
-
                                     Generate
-
                                 </button>
-
                             @else
-
                                 <button class="view-summary-btn ml-2 px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors" 
-
                                         data-summary="{{ str_replace('"', '&quot;', $file['summary']) }}">
-
                                     View Full Summary
-
                                 </button>
-
                             @endif
-
                         </p>
-
                         
-
                         {{-- Expandable summary section --}}
-
-                        <div class="summary-details hidden mt-3 p-3 bg-gray-50 dark:bg-gray-600 rounded-lg border-l-4 border-green-500">
-
+                        <div class="summary-details hidden mt-3 p-3 bg-gray-600 rounded-lg border-l-4 border-green-500">
                             <div class="flex justify-between items-start mb-2">
-
-                                <h4 class="text-gray-900 dark:text-white font-medium">Full Summary</h4>
-
-                                <button class="close-summary-btn text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors">
-
+                                <h4 class="text-white font-medium">Full Summary</h4>
+                                <button class="close-summary-btn text-gray-400 hover:text-white transition-colors">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-
                                     </svg>
-
                                 </button>
-
                             </div>
-
-                            <p class="text-gray-800 dark:text-gray-200 text-sm leading-relaxed summary-full-text"></p>
-
+                            <p class="text-gray-200 text-sm leading-relaxed summary-full-text"></p>
                         </div>
-
                         
-
-                        <a href="{{ $file['url'] ?? '#' }}" target="_blank" class="text-blue-600 dark:text-blue-400 hover:underline mt-2 block transition-colors">View Document</a>
-
+                        <a href="{{ $file['url'] ?? '#' }}" target="_blank" class="text-blue-400 hover:underline mt-2 block transition-colors">View Document</a>
                     </li>
-
                 @endforeach
-
             </ul>
-
         @endif
-
     </div>
 
-    {{-- JS for toggle form --}}
+    {{-- JS for toggle forms --}}
     <script>
-        const toggleBtn = document.getElementById('show-upload-form');
+        const showTextBtn = document.getElementById('show-text-input');
+        const showUploadBtn = document.getElementById('show-upload-form');
+        const textForm = document.getElementById('text-input-form');
         const uploadForm = document.getElementById('upload-form');
 
-        toggleBtn.addEventListener('click', function(e) {
+        showTextBtn.addEventListener('click', function(e) {
             e.preventDefault();
-            if(uploadForm.style.display === 'none') {
-                uploadForm.style.display = 'block';
-            } else {
-                uploadForm.style.display = 'none';
-            }
+            textForm.style.display = 'block';
+            uploadForm.style.display = 'none';
+        });
+
+        showUploadBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            uploadForm.style.display = 'block';
+            textForm.style.display = 'none';
         });
     </script>
     
-    {{-- Upload script with dynamic progress feedback --}}
+    {{-- Text input script --}}
+    <script>
+        document.getElementById('ajax-text-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const form = this;
+            const formData = new FormData(form);
+            const feedback = document.getElementById('upload-feedback');
+            const textBtn = document.getElementById('text-btn');
+            const btnText = document.getElementById('text-btn-text');
+            const btnSpinner = document.getElementById('text-btn-spinner');
+            const textarea = form.querySelector('textarea[name="text_content"]');
+
+            // Validate text content
+            const textContent = textarea.value.trim();
+            if (textContent.length < 50) {
+                feedback.textContent = 'Please enter at least 50 characters of text.';
+                feedback.className = 'mt-2 text-red-400';
+                return;
+            }
+
+            if (textContent.length > 5000) {
+                feedback.textContent = 'Text is too long. Please limit to 5000 characters.';
+                feedback.className = 'mt-2 text-red-400';
+                return;
+            }
+
+            // Update UI to processing state
+            textBtn.disabled = true;
+            btnText.textContent = 'Processing...';
+            btnSpinner.classList.remove('hidden');
+            textarea.disabled = true;
+            feedback.textContent = 'AI is analyzing your text...';
+            feedback.className = 'mt-2 text-blue-400';
+
+            fetch("{{ route('dashboard.summarize-text') }}", {
+                method: "POST",
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    // Success feedback
+                    feedback.textContent = 'Text summarized and saved successfully!';
+                    feedback.className = 'mt-2 text-green-400 font-semibold';
+
+                    // Add to document list
+                    const list = document.querySelector('#uploaded-files');
+                    const noFilesMsg = document.querySelector('p.text-gray-400');
+                    if(noFilesMsg && noFilesMsg.textContent.includes('No documents uploaded yet')) {
+                        noFilesMsg.remove();
+                    }
+                    
+                    let filesList = document.getElementById('uploaded-files');
+                    if(!filesList) {
+                        filesList = document.createElement('ul');
+                        filesList.id = 'uploaded-files';
+                        filesList.className = 'space-y-4';
+                        document.querySelector('.py-6').appendChild(filesList);
+                    }
+                    
+                    const li = document.createElement('li');
+                    li.classList.add('p-4','bg-gray-700','rounded');
+                    li.setAttribute('data-document-id', data.file.id);
+                    li.setAttribute('data-name', data.file.original_name);
+                    li.setAttribute('data-date', 'Just now');
+                    li.setAttribute('data-size', data.file.size);
+                    li.setAttribute('data-type', 'txt');
+                    
+                    const truncatedSummary = data.file.summary.length > 60 ? data.file.summary.substring(0, 60) + '...' : data.file.summary;
+                    
+                    li.innerHTML = `<div class="flex justify-between items-start mb-2">
+                                        <strong class="text-white">${data.file.original_name}</strong>
+                                        <button class="delete-file-btn text-red-400 hover:text-red-300 transition-colors" data-document-id="${data.file.id}" data-filename="${data.file.original_name}">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    <p class="text-gray-300 text-sm mt-1">
+                                        <span class="text-gray-400">Size:</span> ${data.file.size} | 
+                                        <span class="text-gray-400">Type:</span> TEXT | 
+                                        <span class="text-gray-400">Created:</span> Just now
+                                    </p>
+                                    <p class="text-gray-300 mt-1">
+                                        <em>Summary:</em> <span class="summary-text">${truncatedSummary}</span>
+                                        <button class="view-summary-btn ml-2 px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors" data-summary="${data.file.summary.replace(/"/g, '&quot;')}">View Full Summary</button>
+                                    </p>
+                                    <div class="summary-details hidden mt-3 p-3 bg-gray-600 rounded-lg border-l-4 border-green-500">
+                                        <div class="flex justify-between items-start mb-2">
+                                            <h4 class="text-white font-medium">Full Summary</h4>
+                                            <button class="close-summary-btn text-gray-400 hover:text-white transition-colors">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                        <p class="text-gray-200 text-sm leading-relaxed summary-full-text"></p>
+                                    </div>
+                                    <p class="text-gray-400 text-xs mt-2">Direct text input - no file to download</p>`;
+                    
+                    filesList.insertBefore(li, filesList.firstChild); // Add to top of list
+                    
+                    // Reset form
+                    form.reset();
+                    
+                    // Auto-hide form after success
+                    setTimeout(() => {
+                        document.getElementById('text-input-form').style.display = 'none';
+                        feedback.textContent = '';
+                    }, 3000);
+                } else {
+                    feedback.textContent = 'Summarization failed: ' + (data.message || 'Unknown error');
+                    feedback.className = 'mt-2 text-red-400';
+                }
+            })
+            .catch(err => {
+                console.error('Summarization error:', err);
+                feedback.textContent = 'Error processing text: ' + err.message;
+                feedback.className = 'mt-2 text-red-400';
+            })
+            .finally(() => {
+                textBtn.disabled = false;
+                btnText.textContent = 'Summarize';
+                btnSpinner.classList.add('hidden');
+                textarea.disabled = false;
+            });
+        });
+    </script>
+
+    {{-- File upload script with dynamic feedback --}}
     <script>
         let progressInterval;
         let currentStep = 0;
@@ -369,76 +428,59 @@
                     // Update file list
                     const list = document.querySelector('#uploaded-files');
                     const noFilesMsg = document.querySelector('p.text-gray-400');
-                    if (noFilesMsg && noFilesMsg.textContent.includes('No documents uploaded yet')) {
+                    if(noFilesMsg && noFilesMsg.textContent.includes('No documents uploaded yet')) {
                         noFilesMsg.remove();
                     }
-
+                    
                     let filesList = document.getElementById('uploaded-files');
-                    if (!filesList) {
+                    if(!filesList) {
                         filesList = document.createElement('ul');
                         filesList.id = 'uploaded-files';
                         filesList.className = 'space-y-4';
                         document.querySelector('.py-6').appendChild(filesList);
                     }
-
+                    
                     const li = document.createElement('li');
-                    li.classList.add(
-                        'p-4',
-                        'rounded',
-                        'bg-white', 'dark:bg-gray-700',  // light + dark background
-                        'shadow'
-                    );
+                    li.classList.add('p-4','bg-gray-700','rounded');
                     li.setAttribute('data-document-id', data.file.id);
                     li.setAttribute('data-name', data.file.original_name);
                     li.setAttribute('data-date', 'Just now');
                     li.setAttribute('data-size', data.file.size);
                     li.setAttribute('data-type', data.file.original_name.split('.').pop().toLowerCase());
-
-                    const truncatedSummary =
-                        data.file.summary.length > 60
-                            ? data.file.summary.substring(0, 60) + '...'
-                            : data.file.summary;
-
-                    li.innerHTML = `
-                        <div class="flex justify-between items-start mb-2">
-                            <strong class="text-gray-900 dark:text-white">${data.file.original_name}</strong>
-                            <button class="delete-file-btn text-red-600 dark:text-red-400 hover:text-red-500 dark:hover:text-red-300 transition-colors" 
-                                    data-document-id="${data.file.id}" 
-                                    data-filename="${data.file.original_name}">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                </svg>
-                            </button>
-                        </div>
-                        <p class="text-gray-700 dark:text-gray-300 text-sm mt-1">
-                            <span class="text-gray-500 dark:text-gray-400">Size:</span> ${data.file.size} | 
-                            <span class="text-gray-500 dark:text-gray-400">Type:</span> ${data.file.original_name.split('.').pop().toUpperCase()} |
-                            <span class="text-gray-500 dark:text-gray-400">Uploaded:</span> Just now
-                        </p>
-                        <p class="text-gray-700 dark:text-gray-300 mt-1">
-                            <em>Summary:</em> <span class="summary-text">${truncatedSummary}</span>
-                            ${
-                                data.file.summary === 'Click to generate summary'
-                                    ? `<button class="generate-summary-btn ml-2 px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors">Generate</button>`
-                                    : `<button class="view-summary-btn ml-2 px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors" data-summary="${data.file.summary.replace(/"/g, '&quot;')}">View Full Summary</button>`
-                            }
-                        </p>
-                        <div class="summary-details hidden mt-3 p-3 rounded-lg border-l-4 border-green-500 bg-gray-100 dark:bg-gray-600">
-                            <div class="flex justify-between items-start mb-2">
-                                <h4 class="text-gray-900 dark:text-white font-medium">Full Summary</h4>
-                                <button class="close-summary-btn text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                                    </svg>
-                                </button>
-                            </div>
-                            <p class="text-gray-800 dark:text-gray-200 text-sm leading-relaxed summary-full-text"></p>
-                        </div>
-                        <a href="${data.file.url}" target="_blank" class="text-blue-600 dark:text-blue-400 hover:underline mt-2 block transition-colors">View Document</a>
-                    `;
-
+                    
+                    const truncatedSummary = data.file.summary.length > 60 ? data.file.summary.substring(0, 60) + '...' : data.file.summary;
+                    
+                    li.innerHTML = `<div class="flex justify-between items-start mb-2">
+                                        <strong class="text-white">${data.file.original_name}</strong>
+                                        <button class="delete-file-btn text-red-400 hover:text-red-300 transition-colors" data-document-id="${data.file.id}" data-filename="${data.file.original_name}">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    <p class="text-gray-300 text-sm mt-1">
+                                        <span class="text-gray-400">Size:</span> ${data.file.size} | 
+                                        <span class="text-gray-400">Type:</span> ${data.file.original_name.split('.').pop().toUpperCase()} |
+                                        <span class="text-gray-400">Uploaded:</span> Just now
+                                    </p>
+                                    <p class="text-gray-300 mt-1">
+                                        <em>Summary:</em> <span class="summary-text">${truncatedSummary}</span>
+                                        ${data.file.summary === 'Click to generate summary' ? '<button class="generate-summary-btn ml-2 px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors">Generate</button>' : '<button class="view-summary-btn ml-2 px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors" data-summary="' + data.file.summary.replace(/"/g, '&quot;') + '">View Full Summary</button>'}
+                                    </p>
+                                    <div class="summary-details hidden mt-3 p-3 bg-gray-600 rounded-lg border-l-4 border-green-500">
+                                        <div class="flex justify-between items-start mb-2">
+                                            <h4 class="text-white font-medium">Full Summary</h4>
+                                            <button class="close-summary-btn text-gray-400 hover:text-white transition-colors">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                        <p class="text-gray-200 text-sm leading-relaxed summary-full-text"></p>
+                                    </div>
+                                    <a href="${data.file.url}" target="_blank" class="text-blue-400 hover:underline mt-2 block transition-colors">View Document</a>`;
+                    
                     filesList.appendChild(li);
-
                     
                     // Reset form
                     form.reset();

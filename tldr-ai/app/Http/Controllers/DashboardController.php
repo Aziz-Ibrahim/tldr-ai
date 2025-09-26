@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 
+use Smalot\PdfParser\Parser;
+
 class DashboardController extends Controller
 {
     protected $supabase;
@@ -242,7 +244,107 @@ class DashboardController extends Controller
     }
 
     /**
-     * Delete a document
+     * Handle direct text summarization
+     */
+    public function summarizeText(Request $request)
+    {
+        try {
+            $request->validate([
+                'text_content' => 'required|string|min:50|max:5000',
+            ]);
+
+            $textContent = trim($request->input('text_content'));
+            
+            // Generate summary directly from text
+            $summary = $this->generateTextSummary($textContent);
+
+            return response()->json([
+                'success' => true,
+                'summary' => $summary,
+                'message' => 'Text summarized successfully!'
+            ]);
+            
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error: ' . implode(', ', $e->validator->errors()->all())
+            ], 422);
+            
+        } catch (\Exception $e) {
+            Log::error('Text summarization error: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to summarize text: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Generate summary directly from text content
+     */
+    protected function generateTextSummary(string $content): string
+    {
+        if (empty($this->hfToken)) {
+            throw new \Exception('AI summarization service not configured');
+        }
+
+        Log::info('Generating summary for direct text input, length: ' . strlen($content));
+
+        // Clean the text content
+        $content = preg_replace('/\s+/', ' ', trim($content));
+        $content = substr($content, 0, 1000); // Limit for API
+
+        // Try multiple models
+        $models = [
+            'facebook/bart-large-cnn',
+            'sshleifer/distilbart-cnn-12-6',
+            'google/pegasus-xsum'
+        ];
+
+        foreach ($models as $index => $model) {
+            try {
+                Log::info('Trying model #' . ($index + 1) . ': ' . $model);
+                
+                $timeout = ($index === 0) ? 15 : 25;
+                $response = Http::timeout($timeout)
+                    ->retry(2, 1000)
+                    ->withHeaders([
+                        'Authorization' => 'Bearer ' . $this->hfToken,
+                        'Content-Type' => 'application/json',
+                    ])
+                    ->post('https://api-inference.huggingface.co/models/' . $model, [
+                        'inputs' => $content,
+                        'options' => [
+                            'wait_for_model' => true,
+                            'use_cache' => false
+                        ]
+                    ]);
+
+                if ($response->successful()) {
+                    $result = $response->json();
+                    
+                    if (isset($result[0]['summary_text'])) {
+                        $summary = trim($result[0]['summary_text']);
+                        Log::info('SUCCESS with model ' . $model);
+                        return 'AI Summary: ' . $summary;
+                    }
+                }
+                
+            } catch (\Exception $e) {
+                Log::warning('Model ' . $model . ' failed: ' . $e->getMessage());
+                if ($index < count($models) - 1) {
+                    continue;
+                }
+                throw $e;
+            }
+        }
+
+        throw new \Exception('All AI models failed or timed out');
+    }
+
+    /**
+     * Delete document
      */
     public function delete(Request $request)
     {
@@ -317,8 +419,16 @@ class DashboardController extends Controller
         } catch (\Exception $e) {
             Log::error('Summary generation failed for document ' . $document->id . ': ' . $e->getMessage());
             
-            // Save fallback summary
-            $fallbackSummary = 'Unable to extract readable text from this file type.';
+            // Save more descriptive fallback summary based on error type
+            $errorMessage = $e->getMessage();
+            if (strpos($errorMessage, 'text extraction failed') !== false || strpos($errorMessage, 'encoded or corrupted') !== false) {
+                $fallbackSummary = 'Unable to extract readable text from this file. The file may be image-based, encrypted, or in an unsupported format.';
+            } elseif (strpos($errorMessage, 'too short') !== false) {
+                $fallbackSummary = 'File uploaded successfully, but content is too short to generate a meaningful summary.';
+            } else {
+                $fallbackSummary = 'File uploaded successfully, but summary generation is temporarily unavailable.';
+            }
+            
             $document->update([
                 'summary' => $fallbackSummary,
                 'summary_generated' => true,

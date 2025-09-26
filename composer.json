@@ -1,5 +1,6 @@
 {
     "require": {
-        "supabase/supabase-php": "^0.0.1"
+        "supabase/supabase-php": "^0.0.1",
+        "smalot/pdfparser": "^2.12"
     }
 }

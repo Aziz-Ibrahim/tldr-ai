@@ -21,6 +21,9 @@ Route::middleware(['auth'])->group(function () {
     // Dashboard + document list
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
+    // Summarize text input from dashboard form
+    Route::post('/dashboard/summarize-text', [DashboardController::class, 'summarizeText'])->name('dashboard.summarize-text');
+
     // Handle uploads from dashboard form
     Route::post('/dashboard/upload', [DashboardController::class, 'upload'])->name('dashboard.upload');
 
