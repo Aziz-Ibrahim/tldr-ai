@@ -10,6 +10,10 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 
 use Smalot\PdfParser\Parser;
+use Illuminate\Support\Facades\Storage;
+
+use PhpOffice\PhpWord\IOFactory;
+use PhpOffice\PhpWord\Reader\Exception as ReaderException;
 
 class DashboardController extends Controller
 {
@@ -484,17 +488,8 @@ class DashboardController extends Controller
 
         Log::info('Fetching file content from: ' . $fileUrl);
         
-        // Get file content
-        $response = Http::timeout(10)->get($fileUrl);
-        if (!$response->successful()) {
-            throw new \Exception('Could not fetch file content, HTTP status: ' . $response->status());
-        }
-
-        $rawContent = $response->body();
-        Log::info('File content fetched, length: ' . strlen($rawContent) . ' bytes');
-        
         // Extract text based on file type
-        $content = $this->extractTextContent($rawContent, $mimeType);
+        $content = $this->extractTextContent($fileUrl, $mimeType);
         
         // Skip if content is too short
         if (strlen(trim($content)) < 50) {
@@ -573,37 +568,122 @@ class DashboardController extends Controller
     }
 
     /**
-     * Extract text content from different file types
+     * Extract text content from different file types (REFACTORED)
      */
-    protected function extractTextContent(string $rawContent, string $mimeType): string
+    protected function extractTextContent(string $fileUrl, string $mimeType): string
     {
-        Log::info('Extracting text from MIME type: ' . $mimeType);
-        
+        Log::info('Extracting text from MIME type: ' . $mimeType . ' from URL ' . $fileUrl);
+
         switch ($mimeType) {
             case 'application/pdf':
-                $extractedText = $this->extractPdfText($rawContent);
-                // Validate quality before returning
-                if (!$this->isTextQualityAcceptable($extractedText)) {
-                    throw new \Exception('PDF text extraction failed - content appears to be encoded or corrupted');
-                }
-                return $extractedText;
+                return $this->extractPdfTextFromUrl($fileUrl);
             
             case 'text/plain':
-                return $this->cleanTextContent($rawContent);
-            
-            case 'application/msword':
-            case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-                $extractedText = $this->extractReadableText($rawContent);
-                if (!$this->isTextQualityAcceptable($extractedText)) {
-                    throw new \Exception('Document text extraction failed - unable to read content');
+                $response = Http::timeout(10)->get($fileUrl);
+                if (!$response->successful()) {
+                    throw new \Exception('Could not fetch file content, HTTP status: ' . $response->status());
                 }
-                return $extractedText;
+                return $this->cleanTextContent($response->body());
+
+            case 'application/msword': // .doc
+            case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': // .docx
+                return $this->extractWordTextFromUrl($fileUrl, $mimeType);
             
             default:
                 if (strpos($mimeType, 'text/') === 0) {
-                    return $this->cleanTextContent($rawContent);
+                    $response = Http::timeout(10)->get($fileUrl);
+                    if (!$response->successful()) {
+                        throw new \Exception('Could not fetch file content, HTTP status: ' . $response->status());
+                    }
+                    return $this->cleanTextContent($response->body());
                 }
                 throw new \Exception('Unsupported file type for text extraction: ' . $mimeType);
+        }
+    }
+    
+    /**
+     * Extracts text from a DOC or DOCX file stored at a given URL.
+     */
+    protected function extractWordTextFromUrl(string $fileUrl, string $mimeType): string
+    {
+        try {
+            Log::info('Downloading Word file from URL for text extraction: ' . $fileUrl);
+            $response = Http::timeout(60)->get($fileUrl);
+            if (!$response->successful()) {
+                throw new \Exception('Could not download the Word file from Supabase. Status: ' . $response->status());
+            }
+
+            $tempFile = tempnam(sys_get_temp_dir(), 'word_');
+            file_put_contents($tempFile, $response->body());
+
+            // Determine reader based on MIME type
+            $reader = null;
+            if ($mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+                $reader = IOFactory::createReader('Word2007');
+            } elseif ($mimeType === 'application/msword') {
+                $reader = IOFactory::createReader('Word2007'); // PHPWord still uses Word2007 reader for .doc
+            } else {
+                throw new \Exception('Unsupported Word file type.');
+            }
+
+            if (!$reader->canRead($tempFile)) {
+                throw new \Exception('Cannot read the file with the selected reader.');
+            }
+
+            $phpWord = $reader->load($tempFile);
+            $text = '';
+            foreach ($phpWord->getSections() as $section) {
+                foreach ($section->getElements() as $element) {
+                    if (method_exists($element, 'getText')) {
+                        $text .= $element->getText() . ' ';
+                    }
+                }
+            }
+
+            unlink($tempFile);
+            Log::info('Word temporary file deleted.');
+            
+            return $this->cleanTextContent($text);
+
+        } catch (\Exception $e) {
+            Log::error('Word document extraction from URL failed: ' . $e->getMessage());
+            throw new \Exception('Document text extraction failed - ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Extracts text from a PDF file stored at a given URL. (NEW METHOD)
+     */
+    protected function extractPdfTextFromUrl(string $fileUrl): string
+    {
+        try {
+            Log::info('Downloading PDF from URL for text extraction: ' . $fileUrl);
+            // Download the file to a temporary location
+            $response = Http::timeout(60)->get($fileUrl);
+            if (!$response->successful()) {
+                throw new \Exception('Could not download the file from Supabase. Status: ' . $response->status());
+            }
+            
+            // Create a temporary file to store the downloaded content
+            $tempFile = tempnam(sys_get_temp_dir(), 'pdf_');
+            file_put_contents($tempFile, $response->body());
+
+            // Use Smalot\PdfParser to extract text
+            $parser = new Parser();
+            $pdf = $parser->parseFile($tempFile);
+            $text = $pdf->getText();
+
+            // Clean up: Delete the temporary file
+            unlink($tempFile);
+            Log::info('PDF temporary file deleted.');
+
+            // Return the extracted and cleaned text
+            return $this->cleanTextContent($text);
+
+        } catch (\Exception $e) {
+            // Log the error for debugging
+            Log::error('PDF extraction from URL failed: ' . $e->getMessage());
+            throw new \Exception('PDF text extraction failed - ' . $e->getMessage());
         }
     }
 
@@ -665,117 +745,6 @@ class DashboardController extends Controller
         
         Log::info('Text quality accepted - ' . $realWordCount . ' real words, letter ratio: ' . number_format($letterRatio, 3));
         return true;
-    }
-
-    /**
-     * Extract text from PDF (improved approach)
-     */
-    protected function extractPdfText(string $pdfContent): string
-    {
-        Log::info('Attempting PDF text extraction');
-        
-        $text = '';
-        
-        // Method 1: Look for readable text patterns (improved)
-        if (preg_match_all('/\(([^)]+)\)/', $pdfContent, $matches)) {
-            foreach ($matches[1] as $match) {
-                $cleanText = $this->cleanPdfText($match);
-                // Only include text that has actual readable content
-                if (strlen($cleanText) > 3 && preg_match('/[a-zA-Z]{2,}/', $cleanText)) {
-                    $text .= $cleanText . ' ';
-                }
-            }
-        }
-        
-        // Method 2: Look for text objects with better filtering
-        if (strlen($text) < 100) {
-            // Look for text between quotes or parentheses with stricter filtering
-            if (preg_match_all('/"([^"]+)"/', $pdfContent, $quoteMatches)) {
-                foreach ($quoteMatches[1] as $match) {
-                    $cleanText = trim($match);
-                    if (strlen($cleanText) > 3 && preg_match('/[a-zA-Z]{2,}/', $cleanText)) {
-                        $text .= $cleanText . ' ';
-                    }
-                }
-            }
-        }
-        
-        // Method 3: Extract readable ASCII sequences (more selective)
-        if (strlen($text) < 100) {
-            // Look for sequences of readable text (letters, numbers, basic punctuation)
-            if (preg_match_all('/[a-zA-Z][a-zA-Z0-9\s\.\,\!\?\-\:\;]{5,}[a-zA-Z0-9]/', $pdfContent, $readableMatches)) {
-                foreach ($readableMatches[0] as $match) {
-                    $cleanText = trim($match);
-                    // Skip if it looks like random characters or encoding
-                    if (strlen($cleanText) > 10 && !preg_match('/[^\x20-\x7E]/', $cleanText)) {
-                        $text .= $cleanText . ' ';
-                    }
-                }
-            }
-        }
-        
-        // Method 4: Fallback - extract any meaningful words
-        if (strlen($text) < 50) {
-            // Look for individual words and combine them
-            if (preg_match_all('/\b[a-zA-Z]{3,}\b/', $pdfContent, $wordMatches)) {
-                $words = array_unique($wordMatches[0]);
-                // Only use words that look real (not random characters)
-                $validWords = array_filter($words, function($word) {
-                    return strlen($word) >= 3 && 
-                           strlen($word) <= 15 && 
-                           !preg_match('/^[A-Z]{4,}$/', $word) && // Skip all caps sequences
-                           preg_match('/[aeiou]/i', $word); // Must contain vowels
-                });
-                
-                if (count($validWords) > 5) {
-                    $text = implode(' ', array_slice($validWords, 0, 50));
-                }
-            }
-        }
-        
-        // Clean and validate the extracted text
-        $text = $this->cleanTextContent($text);
-        
-        Log::info('PDF text extraction result: ' . strlen($text) . ' characters');
-        Log::info('PDF text preview: ' . substr($text, 0, 200) . '...');
-        
-        if (strlen($text) < 20) {
-            throw new \Exception('Could not extract meaningful text from PDF - may be image-based or encoded');
-        }
-        
-        // Final validation - check if text is mostly readable
-        $readableRatio = $this->calculateReadableRatio($text);
-        if ($readableRatio < 0.7) {
-            throw new \Exception('Extracted text contains too many non-readable characters (ratio: ' . $readableRatio . ')');
-        }
-        
-        return substr($text, 0, 1000);
-    }
-
-    /**
-     * Calculate ratio of readable characters in text
-     */
-    protected function calculateReadableRatio(string $text): float
-    {
-        if (empty($text)) return 0;
-        
-        $totalChars = strlen($text);
-        $readableChars = strlen(preg_replace('/[^a-zA-Z0-9\s\.\,\!\?\-\:\;]/', '', $text));
-        
-        return $readableChars / $totalChars;
-    }
-
-    /**
-     * Clean PDF text extraction results
-     */
-    protected function cleanPdfText(string $text): string
-    {
-        // Remove PDF escape sequences
-        $text = str_replace(['\\r', '\\n', '\\t'], [' ', ' ', ' '], $text);
-        $text = preg_replace('/\\\\[0-9]{1,3}/', '', $text); // Remove octal sequences
-        $text = str_replace(['\\(', '\\)', '\\\\'], ['(', ')', '\\'], $text);
-        
-        return trim($text);
     }
 
     /**
