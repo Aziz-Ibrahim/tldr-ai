@@ -264,7 +264,14 @@ class DashboardController extends Controller
 
             return response()->json([
                 'success' => true,
-                'summary' => $summary,
+                'file' => [
+                    'id' => 'direct_text_input', // Add a dummy ID for the UI
+                    'name' => 'Direct Text Input',
+                    'original_name' => 'Direct Text Input',
+                    'summary' => $summary,
+                    'size' => strlen($textContent),
+                    'summary_generated' => true,
+                ],
                 'message' => 'Text summarized successfully!'
             ]);
             
