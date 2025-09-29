@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-200 leading-tight">
+        <h2 class="font-semibold text-xl leading-tight">
             Dashboard
         </h2>
     </x-slot>
@@ -8,17 +8,16 @@
     <div class="py-6 px-4 max-w-7xl mx-auto">
 
         {{-- Security Warning --}}
-        <div class="mb-6 p-4 border border-yellow-600 rounded-lg">
+        <div class="mb-6 p-4 bg-yellow-100 dark:bg-gray-800 border border-yellow-600 rounded-lg">
             <div class="flex items-center mb-2">
-                <svg class="w-5 h-5 text-yellow-200 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-5 h-5 text-yellow-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L5.268 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
                 </svg>
-                <h3 class="text-yellow-100 font-medium">Privacy Notice</h3>
+                <h3 class="text-gray-600 dark:text-yellow-600 font-medium">Privacy Notice</h3>
             </div>
-            <p class="text-yellow-100 text-sm">
+            <p class="text-gray-600 dark:text-yellow-600 text-sm">
                 <strong>Do not upload or input sensitive information</strong> such as personal documents, financial records, passwords, 
-                medical information, or confidential business data. This service processes content through external AI services 
-                and stores summaries in our database. Use only non-sensitive content for summarization.
+                medical information, or confidential business data. Use only non-sensitive content for summarization.
             </p>
         </div>
 
@@ -81,7 +80,7 @@
             <div id="upload-feedback" class="mt-2 text-green-400"></div>
         </div>
 
-        <h3 class="text-gray-200 text-lg font-semibold mb-4">Uploaded Documents</h3>
+        <h3 class="text-lg font-semibold mb-4">Uploaded Documents</h3>
 
         {{-- Sorting and controls --}}
         <div class="mb-4 flex flex-wrap gap-2 items-center">
