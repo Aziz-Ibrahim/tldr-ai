@@ -113,6 +113,14 @@ curl -X POST https://your-app-url.com/api/register \
      -d '{"name": "John Doe", "email": "john@example.com", "password": "secret"}'
 ```
 
+
+Login:
+```bash
+curl -X POST https://your-app-url.com/api/login \
+     -H "Content-Type: application/json" \
+     -d '{"email": "john@example.com", "password": "secret"}'
+```
+
 ### 3. Create a Summary
 Send raw text to be summarized:
 ```bash
@@ -128,13 +136,6 @@ Expected response:
 }
 ```
 
-
-Login:
-```bash
-curl -X POST https://your-app-url.com/api/login \
-     -H "Content-Type: application/json" \
-     -d '{"email": "john@example.com", "password": "secret"}'
-```
 
 ---
 
