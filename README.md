@@ -105,28 +105,7 @@ Expected response:
 { "status": "ok" }
 ```
 
-### 2. Create a Summary
-Send raw text to be summarized:
-```bash
-curl -X POST https://your-app-url.com/api/summarize \
-     -H "Content-Type: application/json" \
-     -d '{"text": "Your long article or content goes here"}'
-```
-
-Expected response:
-```json
-{
-  "summary": "This is the short version of your text."
-}
-```
-
-### 3. Fetch Crumbs
-Retrieve a paginated list of saved summaries:
-```bash
-curl https://your-app-url.com/api/crumbs?page=1
-```
-
-### 4. Authentication (if enabled)
+### 2. Authentication (if enabled)
 Register:
 ```bash
 curl -X POST https://your-app-url.com/api/register \
@@ -139,6 +118,21 @@ Login:
 curl -X POST https://your-app-url.com/api/login \
      -H "Content-Type: application/json" \
      -d '{"email": "john@example.com", "password": "secret"}'
+```
+
+### 3. Create a Summary
+Send raw text to be summarized:
+```bash
+curl -X POST https://your-app-url.com/api/summarize \
+     -H "Content-Type: application/json" \
+     -d '{"text": "Your long article or content goes here"}'
+```
+
+Expected response:
+```json
+{
+  "summary": "This is the short version of your text."
+}
 ```
 
 ---
